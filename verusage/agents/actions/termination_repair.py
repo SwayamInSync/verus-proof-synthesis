@@ -110,7 +110,7 @@ class TerminationRepairAction(BaseAction):
             query,
             self.default_system,
             answer_num=num,
-            max_tokens=4096,
+            # max_tokens from config
             temp=temp,
             original_code=code,
         )

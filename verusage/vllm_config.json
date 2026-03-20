@@ -3,12 +3,14 @@
     "aoai_api_base": ["http://localhost:8000/v1"],
     "aoai_api_key": ["dummy"],
     "aoai_max_retries": 3,
-    "max_token": 32768,
-    "action_max_tokens": 16384,
-    "api_timeout": 120,
-    "aoai_generation_model": "/home/t-swsingh/proof-model/ours/verified-code-gen/models/unsloth/Qwen2.5-Coder-3B-Instruct",
-    "aoai_debug_model": "/home/t-swsingh/proof-model/ours/verified-code-gen/models/unsloth/Qwen2.5-Coder-3B-Instruct",
+    "max_token": 262144,
+    "max_model_context": 262144,
+    "action_max_tokens": 4096,
+    "api_timeout": 180,
+    "aoai_generation_model": "/home/t-swsingh/proof-model/ours/verified-code-gen/models/Qwen/Qwen3-4B-Thinking-2507",
+    "aoai_debug_model": "/home/t-swsingh/proof-model/ours/verified-code-gen/models/Qwen/Qwen3-4B-Thinking-2507",
     "verus_path": "/home/t-swsingh/proof-model/ours/verified-code-gen/verus-binary/verus/verus",
     "debug_max_attempt": 3,
-    "debug_temp": 1.0
+    "debug_temp": 1.0,
+    "repair_steps": 5
 }

@@ -142,6 +142,17 @@ class LLM:
 
         messages.append({"role": "user", "content": query})
 
+        # # Dynamically cap max_tokens to fit within model context window
+        # max_model_context = getattr(self.config, 'max_model_context', 32768)
+        # estimated_input_tokens = sum(len(m.get("content", "")) for m in messages) // 4  # ~4 chars/token
+        # if estimated_input_tokens + max_tokens > max_model_context:
+        #     old_max_tokens = max_tokens
+        #     max_tokens = max(256, max_model_context - estimated_input_tokens - 64)  # 64 token safety margin
+        #     self.logger.warning(
+        #         f"Capping max_tokens from {old_max_tokens} to {max_tokens} "
+        #         f"(estimated input: ~{estimated_input_tokens} tokens, context: {max_model_context})"
+        #     )
+
         tries = 0
         max_tries = 5
 

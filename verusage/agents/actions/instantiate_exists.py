@@ -87,6 +87,6 @@ Target code:
             self.default_system,
             original_code=code,
             answer_num=num,
-            max_tokens=4096,
+            # max_tokens from config
             temp=temp,
         )

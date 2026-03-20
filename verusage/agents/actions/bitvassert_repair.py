@@ -132,7 +132,7 @@ The bit_vector prover is completely isolated - treat it as if it has no access t
             query,
             self.default_system,
             answer_num=num,
-            max_tokens=4096,
+            # max_tokens from config
             temp=temp,
             original_code=code,
         )

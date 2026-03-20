@@ -131,7 +131,7 @@ Instead, you should do the following, using a variable with equal value as MYCON
             query,
             self.default_system,
             answer_num=num,
-            max_tokens=4096,
+            # max_tokens from config
             temp=temp,
             original_code=code,
         )
