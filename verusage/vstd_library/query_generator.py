@@ -49,7 +49,6 @@ class QueryGenerator:
                 query=analysis_prompt,
                 system_info="You are a Verus expert. Output valid JSON only.",
                 answer_num=1,
-                max_tokens=2048,
             )
 
             if not responses:

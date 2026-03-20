@@ -54,8 +54,8 @@ def call_llm_with_diff_format(
     original_code: str = "",
     examples: list = None,
     answer_num: int = 1,
-    max_tokens: int = 4096,
-    temp: float = 1.0,
+    max_tokens: int = None,
+    temp: float = None,
 ) -> list[str]:
     """
     Call LLM with SEARCH/REPLACE format instructions and handle the response.
@@ -80,6 +80,13 @@ def call_llm_with_diff_format(
         examples = []
     llm = GlobalConfig.get_llm()
     logger = GlobalConfig.get_logger()
+    config = GlobalConfig.get_config()
+
+    # Resolve defaults from config
+    if max_tokens is None:
+        max_tokens = getattr(config, 'action_max_tokens', getattr(config, 'max_token', 4096))
+    if temp is None:
+        temp = getattr(config, 'debug_temp', 1.0)
 
     # Add SEARCH/REPLACE format instructions to the query
     search_replace_instructions = SearchReplaceFormatter.get_format_instructions()
@@ -126,8 +133,8 @@ def call_llm_with_full_return(
     query: str,
     system: str,
     answer_num: int = 1,
-    max_tokens: int = 4096,
-    temp: float = 1.0,
+    max_tokens: int = None,
+    temp: float = None,
 ) -> list[str]:
     """
     Call LLM expecting full code return (not diff format).
@@ -147,6 +154,13 @@ def call_llm_with_full_return(
         List of LLM responses
     """
     llm = GlobalConfig.get_llm()
+    config = GlobalConfig.get_config()
+
+    # Resolve defaults from config
+    if max_tokens is None:
+        max_tokens = getattr(config, 'action_max_tokens', getattr(config, 'max_token', 4096))
+    if temp is None:
+        temp = getattr(config, 'debug_temp', 1.0)
 
     # Add standard instructions
     query += "\n\nDo not add `proof { ... }` to in the body of the `proof fn` function and `spec fn` function."

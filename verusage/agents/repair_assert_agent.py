@@ -330,8 +330,6 @@ class AssertionErrorAgent(BaseAgent):
                 query=analysis_prompt,
                 system_info="You are a Verus verification expert focused on precise analysis and reasoning.",
                 answer_num=1,
-                max_tokens=8192,
-                temp=1.0,
             )
 
             self.logger.info("🔍 LLM Response:")

@@ -92,12 +92,12 @@ class LLM:
         query,
         system_info=None,
         answer_num=1,
-        max_tokens=8192,
-        temp=1.0,
+        max_tokens=None,
+        temp=None,
         json=False,
         return_msg=False,
         verbose=False,
-        timeout=100,
+        timeout=None,
     ):
         """
         Args:
@@ -116,6 +116,14 @@ class LLM:
         Returns:
             answers: list of str (or tuple of (list of str, messages) if return_msg=True)
         """
+        # Resolve defaults from config
+        if max_tokens is None:
+            max_tokens = getattr(self.config, 'max_token', 8192)
+        if temp is None:
+            temp = getattr(self.config, 'debug_temp', 1.0)
+        if timeout is None:
+            timeout = getattr(self.config, 'api_timeout', 120)
+
         self._reset_client_id()
         if verbose:
             self.logger.info(f"Using client {self.client_id}")
@@ -151,7 +159,7 @@ class LLM:
                                 model=engine,
                                 messages=messages,
                                 temperature=temp,
-                                max_completion_tokens=20000,
+                                max_completion_tokens=max_tokens,
                             )
                         )
                 elif "o3" in engine or "o4" in engine or "gpt-5" in engine:
@@ -164,7 +172,7 @@ class LLM:
                         model=engine,
                         messages=messages,
                         temperature=temp,
-                        max_completion_tokens=20000,
+                        max_completion_tokens=max_tokens,
                     )
                 else:
                     # Standard models - also currently limited to 1 response
@@ -176,7 +184,7 @@ class LLM:
                         model=engine,
                         messages=messages,
                         temperature=temp,
-                        max_tokens=20000,
+                        max_tokens=max_tokens,
                         # n=answer_num,  # Disabled: uncomment to enable multiple responses
                         timeout=timeout,
                     )
@@ -246,8 +254,8 @@ class LLM:
         history,
         query,
         answer_num=1,
-        max_tokens=2048,
-        temp=0.7,
+        max_tokens=None,
+        temp=None,
         json=False,
         return_msg=False,
         verbose=False,
@@ -260,6 +268,12 @@ class LLM:
         Returns:
             answers: list of str
         """
+        # Resolve defaults from config
+        if max_tokens is None:
+            max_tokens = getattr(self.config, 'max_token', 2048)
+        if temp is None:
+            temp = getattr(self.config, 'debug_temp', 0.7)
+
         self._reset_client_id()
         # self.client_id = 0
         if verbose:

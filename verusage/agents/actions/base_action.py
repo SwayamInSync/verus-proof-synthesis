@@ -210,8 +210,8 @@ class BaseAction(ABC):
         original_code="",
         examples=None,
         answer_num=1,
-        max_tokens=4096,
-        temp=1.0,
+        max_tokens=None,
+        temp=None,
         skip_history=False,
     ):
         """
@@ -219,7 +219,13 @@ class BaseAction(ABC):
 
         Examples can now be optionally provided for few-shot learning.
         NO refinement dependency - uses llm_utils directly.
+        max_tokens and temp default to config values if not specified.
         """
+        # Resolve defaults from config
+        if max_tokens is None:
+            max_tokens = getattr(self.config, 'action_max_tokens', getattr(self.config, 'max_token', 4096))
+        if temp is None:
+            temp = getattr(self.config, 'debug_temp', 1.0)
         if not skip_history:
             # Add the history data
             query += "\n\nPlease analyze the previous repair attempts below before proceeding:\n"

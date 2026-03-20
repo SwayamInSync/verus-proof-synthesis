@@ -1,0 +1,14 @@
+{
+    "use_openai": true,
+    "aoai_api_base": ["http://localhost:8000/v1"],
+    "aoai_api_key": ["dummy"],
+    "aoai_max_retries": 3,
+    "max_token": 32768,
+    "action_max_tokens": 16384,
+    "api_timeout": 120,
+    "aoai_generation_model": "/home/t-swsingh/proof-model/ours/verified-code-gen/models/unsloth/Qwen2.5-Coder-3B-Instruct",
+    "aoai_debug_model": "/home/t-swsingh/proof-model/ours/verified-code-gen/models/unsloth/Qwen2.5-Coder-3B-Instruct",
+    "verus_path": "/home/t-swsingh/proof-model/ours/verified-code-gen/verus-binary/verus/verus",
+    "debug_max_attempt": 3,
+    "debug_temp": 1.0
+}
