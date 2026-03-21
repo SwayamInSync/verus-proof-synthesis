@@ -114,6 +114,10 @@ def call_llm_with_diff_format(
     # Process responses using SEARCH/REPLACE format
     modified_codes = []
     for i, response in enumerate(responses):
+        # Handle None responses from thinking models
+        if response is None:
+            logger.warning(f"Response {i} is None (thinking model may have used all tokens for reasoning). Skipping.")
+            continue
         (llm_prompt_dir / f"{time_stamp}-output-{i}.txt").write_text(response, encoding="utf-8")
 
         modified_code, success, message = apply_search_replace_format(original_code, response)

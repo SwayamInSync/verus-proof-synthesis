@@ -248,16 +248,44 @@ class LLM:
         if "gpt-oss" in engine:
             responses = []
             for answer in answers:
-                responses.append(answer.choices[0].message.content)
+                content = answer.choices[0].message.content
+                # Handle thinking models where content may be None
+                # (all tokens used for reasoning_content)
+                if content is None:
+                    reasoning = getattr(answer.choices[0].message, 'reasoning_content', None)
+                    if reasoning:
+                        self.logger.warning(
+                            "LLM returned None content (all tokens used for reasoning). "
+                            f"Reasoning length: {len(reasoning)} chars. Using empty string."
+                        )
+                    else:
+                        self.logger.warning("LLM returned None content with no reasoning.")
+                    content = ""
+                responses.append(content)
             return responses
 
         self.logger.info(f"Input tokens: {answers.usage.prompt_tokens}")
         self.logger.info(f"Output tokens: {answers.usage.completion_tokens}")
 
+        def _extract_content(response):
+            """Extract content from response, handling thinking models where content may be None."""
+            content = response.message.content
+            if content is None:
+                reasoning = getattr(response.message, 'reasoning_content', None)
+                if reasoning:
+                    self.logger.warning(
+                        "LLM returned None content (all tokens used for reasoning). "
+                        f"Reasoning length: {len(reasoning)} chars. Using empty string."
+                    )
+                else:
+                    self.logger.warning("LLM returned None content with no reasoning.")
+                content = ""
+            return content
+
         if return_msg:
-            return [response.message.content for response in answers.choices], messages
+            return [_extract_content(response) for response in answers.choices], messages
         else:
-            return [response.message.content for response in answers.choices]
+            return [_extract_content(response) for response in answers.choices]
 
     def infer_llm_with_history(
         self,
@@ -322,13 +350,30 @@ class LLM:
                 else:
                     self._add_client_id()
                 continue
+        def _extract_content_with_history(response):
+            """Extract content handling thinking models and length-truncated responses."""
+            if response.finish_reason == "length":
+                return ""
+            content = response.message.content
+            if content is None:
+                reasoning = getattr(response.message, 'reasoning_content', None)
+                if reasoning:
+                    self.logger.warning(
+                        "LLM returned None content (all tokens used for reasoning). "
+                        f"Reasoning length: {len(reasoning)} chars. Using empty string."
+                    )
+                else:
+                    self.logger.warning("LLM returned None content with no reasoning.")
+                content = ""
+            return content
+
         if return_msg:
             return [
-                response.message.content if response.finish_reason != "length" else ""
+                _extract_content_with_history(response)
                 for response in answers.choices
             ], messages
         else:
             return [
-                response.message.content if response.finish_reason != "length" else ""
+                _extract_content_with_history(response)
                 for response in answers.choices
             ]

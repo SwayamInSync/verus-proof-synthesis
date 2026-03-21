@@ -74,10 +74,10 @@ class TypeMismatchErrorAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Type repair action failed: {e}")
             return ActionResult(
-                success=False,
-                modified_code=observation.code,
                 action_taken=action_type,
                 explanation=f"Type repair action execution failed: {e}",
+                candidates=[],
+                original_code=observation.code,
             )
 
     def mark_last_action_accepted(self, accepted: bool, feedback: str = ""):
