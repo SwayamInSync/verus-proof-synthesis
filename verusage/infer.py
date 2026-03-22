@@ -118,7 +118,7 @@ class LLM:
         """
         # Resolve defaults from config
         if max_tokens is None:
-            max_tokens = getattr(self.config, 'max_token', 8192)
+            max_tokens = getattr(self.config, 'action_max_tokens', 8192)
         if temp is None:
             temp = getattr(self.config, 'debug_temp', 1.0)
         if timeout is None:
@@ -309,7 +309,7 @@ class LLM:
         """
         # Resolve defaults from config
         if max_tokens is None:
-            max_tokens = getattr(self.config, 'max_token', 2048)
+            max_tokens = getattr(self.config, 'action_max_tokens', 2048)
         if temp is None:
             temp = getattr(self.config, 'debug_temp', 0.7)
 
