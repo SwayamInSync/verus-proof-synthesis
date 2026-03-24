@@ -330,38 +330,71 @@ def parse_search_replace(response: str) -> list[tuple[str, str]]:
         ops.append((m.group(1), m.group(2)))
     return ops
 
-#todo: make it support to patch multiple SEARCH/REPLACE if the LLM suggests multiple edits in one response
-def apply_edits(original: str, response: str) -> str | None:
+def _normalize_whitespace(text: str) -> str:
+    """Strip all leading/trailing whitespace per line for indentation-agnostic matching."""
+    return "\n".join(l.strip() for l in text.split("\n"))
+
+
+def _apply_via_line_range(code: str, search_norm: str, replace: str, code_norm: str) -> str | None:
+    """
+    Given that *search_norm* is known to be a substring of *code_norm*,
+    map back to line numbers in the original *code* and splice in *replace*.
+    Returns the updated code, or None if the mapping fails.
+    """
+    idx = code_norm.find(search_norm)
+    if idx < 0:
+        return None
+    start_line = code_norm[:idx].count("\n")
+    end_line = start_line + search_norm.count("\n")
+    lines = code.split("\n")
+    lines[start_line:end_line + 1] = replace.split("\n")
+    return "\n".join(lines)
+
+
+def apply_edits(original: str, response: str) -> tuple[str | None, int, int]:
     """
     Apply SEARCH/REPLACE edits from *response* to *original*.
-    Falls back to full-code extraction if no SEARCH/REPLACE blocks found.
-    Returns the modified code, or None on failure.
+    Applies each block sequentially in order; skips blocks whose SEARCH
+    text cannot be found in the current code.
+
+    Matching strategy (tried in order):
+      1. Exact substring match
+      2. Whitespace-normalized match (tabs→spaces, trailing whitespace stripped)
+
+    Returns (result_code, applied_count, total_count).
+    result_code is None only when zero edits could be applied AND
+    fallback extraction also failed.
     """
     ops = parse_search_replace(response)
     if ops:
         code = original
+        applied = 0
         for search, replace in ops:
+            # Strategy 1: exact match
             if search in code:
                 code = code.replace(search, replace, 1)
-            else:
-                # Try stripping trailing whitespace per line for fuzzy match
-                search_stripped = "\n".join(l.rstrip() for l in search.split("\n"))
-                code_stripped = "\n".join(l.rstrip() for l in code.split("\n"))
-                if search_stripped in code_stripped:
-                    # Find the position in stripped, apply in original
-                    idx = code_stripped.find(search_stripped)
-                    # Map back: count newlines to find line range
-                    start_line = code_stripped[:idx].count("\n")
-                    end_line = start_line + search_stripped.count("\n")
-                    lines = code.split("\n")
-                    lines[start_line:end_line + 1] = replace.split("\n")
-                    code = "\n".join(lines)
-                else:
-                    return None  # can't apply this edit
-        return code
+                applied += 1
+                continue
+
+            # Strategy 2: whitespace-normalized match
+            # Handles tab↔space differences and trailing whitespace
+            search_norm = _normalize_whitespace(search)
+            code_norm = _normalize_whitespace(code)
+            if search_norm in code_norm:
+                result = _apply_via_line_range(code, search_norm, replace, code_norm)
+                if result is not None:
+                    code = result
+                    applied += 1
+                    continue
+
+            # No match — skip this block
+        if applied > 0:
+            return code, applied, len(ops)
+        return None, 0, len(ops)
     else:
         # Fallback: maybe LLM returned full code in a fenced block
-        return extract_code(response)
+        extracted = extract_code(response)
+        return (extracted, 1, 1) if extracted else (None, 0, 0)
 
 
 def run_verus(code: str, verus_path: str, timeout: int = 90) -> tuple[bool, str, int]:
@@ -503,20 +536,35 @@ def repair_task(
             ))
             continue
         
-        # if we get some model's response put that in the diff for logging, even if we can't apply it
-        suggested_change = content.split("```rust")[1].split("```")[0].strip()
-        new_code = apply_edits(current_code, content)
+        # Extract the raw LLM suggestion for logging (even if we can't apply it)
+        _log_llm_response(rs_path.stem, attempt, content)
+
+        # Build suggested_change from all parsed SEARCH/REPLACE blocks for history logging
+        sr_blocks = parse_search_replace(content)
+        if sr_blocks:
+            parts = []
+            for search, replace in sr_blocks:
+                parts.append(f"<<<<<<< SEARCH\n{search}\n=======\n{replace}\n>>>>>>> REPLACE")
+            suggested_change = "\n\n".join(parts)
+        else:
+            # No SEARCH/REPLACE found — use raw content
+            suggested_change = "LLM did not provide valid SEARCH/REPLACE blocks. Raw response:\n" + content
+
+        new_code, edits_applied, edits_total = apply_edits(current_code, content)
         if not new_code:
+            fail_msg = f"Failed to apply SEARCH/REPLACE edits (0/{edits_total} blocks matched)"
             _log_attempt(rs_path.stem, attempt, messages, content, None,
-                         None, "", None, "Failed to apply edits", p_tok, c_tok)
-            last_errors = "Failed to apply SEARCH/REPLACE edits (no match in code)"
+                         None, "", None, fail_msg, p_tok, c_tok)
+            last_errors = fail_msg
             attempt_history.append(AttemptRecord(
                 attempt_id=attempt, status="REJECTED_EDITS",
                 diff=suggested_change,
-                error_text="The SEARCH blocks did not match any text in the current code.",
+                error_text=fail_msg,
                 code_before=current_code,
             ))
             continue
+        if edits_applied < edits_total:
+            print(f"    [{rs_path.name}] attempt {attempt} — applied {edits_applied}/{edits_total} SEARCH/REPLACE blocks (rest skipped: no match)", flush=True)
 
         safe, reason = is_safe_change(safety_baseline, new_code)
         if not safe:
@@ -671,6 +719,19 @@ def _log_attempt(
     except Exception:
         pass
 
+def _log_llm_response(stem: str, attempt: int, llm_response: str | None):
+    """
+    Save the raw LLM response to <output>/logs/<task>/response-N.txt
+    for cross-checking / debugging.
+    """
+    d = _get_task_log_dir(stem)
+    if d is None:
+        return
+    try:
+        text = llm_response if llm_response is not None else "(no response)"
+        (d / f"response-{attempt}.txt").write_text(text, encoding="utf-8")
+    except Exception:
+        pass
 
 def run_batch(
     tasks_dir: Path,
