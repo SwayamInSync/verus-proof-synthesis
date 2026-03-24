@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import csv
+import difflib
 import json
 import os
 import re
@@ -26,6 +27,7 @@ import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import openai
@@ -80,19 +82,112 @@ so that it verifies. Provide SEARCH/REPLACE edits.
 """
 
 REPAIR_PROMPT_TEMPLATE = """\
-The previous code failed Verus verification with the following errors:
+The following Verus code has proof bodies that need to be filled in or fixed \
+so that it verifies. Provide SEARCH/REPLACE edits.
+
+Original code:
+```verus
+{original_code}
+```
+
+{history}
+
+The most recent code failed Verus verification with the following errors:
 
 ```
 {errors}
 ```
 
-Provide SEARCH/REPLACE edits to fix the proof.
-
-Current code:
-```verus
-{code}
-```
+Provide SEARCH/REPLACE edits to fix the proof. Your edits will be applied to \
+the **Original code**.
+**Important**: Analyze the previous attempts carefully before proposing a new repair. \
+Avoid repeating failed approaches. Consider why each attempt failed and ensure your \
+solution addresses those issues.
 """
+
+
+# ---------------------------------------------------------------------------
+#  Attempt history tracking
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AttemptRecord:
+    """Record of a single repair attempt for history accumulation."""
+    attempt_id: int
+    status: str  # "REJECTED_EDITS", "REJECTED_UNSAFE", "VERUS_FAIL", "LLM_ERROR"
+    diff: str  # SEARCH/REPLACE-style diff
+    error_text: str  # Verus errors or rejection reason
+    code_before: str = ""  # code state before this attempt
+    code_after: str | None = None  # code state after (None if edits failed)
+
+
+def generate_search_replace_diff(old: str, new: str, context: int = 3) -> str:
+    """
+    Generate a compact SEARCH/REPLACE style diff between old and new code,
+    matching the format verusage uses in its history prompts.
+    """
+    old_lines = old.splitlines(keepends=True)
+    new_lines = new.splitlines(keepends=True)
+    diff_lines = list(difflib.unified_diff(
+        old_lines, new_lines, fromfile="before", tofile="after", n=context
+    ))
+    if not diff_lines:
+        return "(No changes detected)"
+    return "".join(diff_lines)
+
+
+def format_attempt_history(history: list[AttemptRecord], max_attempts: int = 8) -> str:
+    """
+    Format accumulated attempt history for inclusion in the LLM prompt.
+    Mirrors the verusage `format_action_history` style.
+    """
+    if not history:
+        return ""
+
+    entries = history[-max_attempts:]  # keep last N
+
+    lines = ["## Previous Repair Attempts"]
+    for rec in entries:
+        if rec.status == "VERUS_FAIL":
+            status_label = "FAILED (verification errors)"
+        elif rec.status == "REJECTED_EDITS":
+            status_label = "REJECTED (could not apply edits)"
+        elif rec.status == "REJECTED_UNSAFE":
+            status_label = "REJECTED (unsafe change)"
+        elif rec.status == "LLM_ERROR":
+            status_label = "ERROR (LLM call failed)"
+        else:
+            status_label = rec.status
+
+        lines.append(f"\n### Attempt {rec.attempt_id}: {status_label}")
+
+        #Instead of the following just log the LLM's response on SEARCH/REPLACE section
+        # if rec.code_after and rec.code_before:
+        #     diff = generate_search_replace_diff(rec.code_before, rec.code_after)
+        #     lines.append("- **Changes applied**:")
+        #     lines.append("  ```diff")
+        #     lines.append(f"  {diff.rstrip()}")
+        #     lines.append("  ```")
+        # elif rec.diff:
+        #     lines.append(f"- **Note**: {rec.diff}")
+
+        lines.append("- **Changes applied**:")
+        lines.append("  ```diff")
+        lines.append(f"  {rec.diff.rstrip()}")
+        lines.append("  ```")
+
+        # Show the resulting error
+        if rec.error_text:
+            # Truncate very long error output to avoid blowing up context
+            err = rec.error_text
+            if len(err) > 2000:
+                err = err[:2000] + "\n... (truncated)"
+            lines.append("- **Verus output**:")
+            lines.append("  ```")
+            lines.append(f"  {err.rstrip()}")
+            lines.append("  ```")
+
+    return "\n".join(lines)
 
 
 def insert_loop_isolation(code: str) -> str:
@@ -235,7 +330,7 @@ def parse_search_replace(response: str) -> list[tuple[str, str]]:
         ops.append((m.group(1), m.group(2)))
     return ops
 
-
+#todo: make it support to patch multiple SEARCH/REPLACE if the LLM suggests multiple edits in one response
 def apply_edits(original: str, response: str) -> str | None:
     """
     Apply SEARCH/REPLACE edits from *response* to *original*.
@@ -350,6 +445,7 @@ def repair_task(
     total_in = total_out = 0
     start = time.time()
     last_errors = ""
+    attempt_history: list[AttemptRecord] = []
 
     print(f"    [{rs_path.name}] starting ({len(original_code)} chars)...", flush=True)
 
@@ -366,10 +462,12 @@ def repair_task(
                 "content": INITIAL_PROMPT_TEMPLATE.format(code=current_code),
             })
         else:
+            history_text = format_attempt_history(attempt_history)
             messages.append({
                 "role": "user",
                 "content": REPAIR_PROMPT_TEMPLATE.format(
-                    errors=last_errors, code=current_code
+                    original_code=original_code,
+                    history=history_text, errors=last_errors
                 ),
             })
 
@@ -387,19 +485,37 @@ def repair_task(
             _log_attempt(rs_path.stem, attempt, messages, None, None,
                          None, "", None, f"BadRequest: {e}", 0, 0)
             last_errors = f"LLM BadRequest: {e}"
+            attempt_history.append(AttemptRecord(
+                attempt_id=attempt, status="LLM_ERROR",
+                diff="LLM BadRequest error, no response is generated", error_text=str(e),
+                code_before=current_code,
+            ))
             continue
         except Exception as e:
             print(f"    [{rs_path.name}] attempt {attempt} — LLM error: {e}", flush=True)
             _log_attempt(rs_path.stem, attempt, messages, None, None,
                          None, "", None, f"LLM error: {e}", 0, 0)
             last_errors = f"LLM error: {e}"
+            attempt_history.append(AttemptRecord(
+                attempt_id=attempt, status="LLM_ERROR",
+                diff="LLM call failed, no response is generated", error_text=str(e),
+                code_before=current_code,
+            ))
             continue
-
+        
+        # if we get some model's response put that in the diff for logging, even if we can't apply it
+        suggested_change = content.split("```rust")[1].split("```")[0].strip()
         new_code = apply_edits(current_code, content)
         if not new_code:
             _log_attempt(rs_path.stem, attempt, messages, content, None,
                          None, "", None, "Failed to apply edits", p_tok, c_tok)
             last_errors = "Failed to apply SEARCH/REPLACE edits (no match in code)"
+            attempt_history.append(AttemptRecord(
+                attempt_id=attempt, status="REJECTED_EDITS",
+                diff=suggested_change,
+                error_text="The SEARCH blocks did not match any text in the current code.",
+                code_before=current_code,
+            ))
             continue
 
         safe, reason = is_safe_change(safety_baseline, new_code)
@@ -407,7 +523,14 @@ def repair_task(
             _log_attempt(rs_path.stem, attempt, messages, content, new_code,
                          False, reason, None, "", p_tok, c_tok)
             last_errors = f"Rejected: {reason}"
+            attempt_history.append(AttemptRecord(
+                attempt_id=attempt, status="REJECTED_UNSAFE",
+                diff=suggested_change, error_text=f"Unsafe change rejected: {reason}",
+                code_before=current_code, code_after=new_code,
+            ))
             continue  # don't update current_code with unsafe changes
+
+        code_before_verus = current_code  # snapshot for history
         current_code = new_code
 
         verified, error_text, verus_exit = run_verus(current_code, verus_path)
@@ -415,6 +538,13 @@ def repair_task(
         # Log the full attempt trace
         _log_attempt(rs_path.stem, attempt, messages, content, current_code,
                      True, "", verified, error_text, p_tok, c_tok)
+
+        if not verified:
+            attempt_history.append(AttemptRecord(
+                attempt_id=attempt, status="VERUS_FAIL",
+                diff=suggested_change, error_text=error_text,
+                code_before=code_before_verus, code_after=current_code,
+            ))
 
         if verified:
             _save_output_code(rs_path.stem, current_code, "verified")
@@ -478,61 +608,65 @@ def _log_attempt(
     tokens_in: int,
     tokens_out: int,
 ):
-    """Write one attempt's full trace to <output>/logs/<task>/attempt-N.txt"""
+    """
+    Write one attempt's log to <output>/logs/<task>/attempt-N.md
+
+    Three clean sections:
+      <Input Prompt>   — complete prompt sent to the LLM
+      <LLM Response>   — raw LLM output
+      <Result>         — what happened (edits / safety / verus)
+    """
     d = _get_task_log_dir(stem)
     if d is None:
         return
     try:
-        parts = []
-        parts.append(f"===== ATTEMPT {attempt} =====")
-        parts.append(f"Tokens: in={tokens_in}, out={tokens_out}")
-        parts.append("")
+        parts: list[str] = []
 
-        # Input messages
-        parts.append("--- INPUT MESSAGES ---")
+        # ---- <Input Prompt> ----
+        parts.append("<Input Prompt>")
         for msg in messages:
-            parts.append(f"[{msg['role']}]")
-            parts.append(msg.get('content', ''))
+            role = msg.get("role", "unknown").upper()
+            content = msg.get("content", "")
+            parts.append(f"[{role}]")
+            parts.append(content)
             parts.append("")
+        parts.append("</Input Prompt>")
+        parts.append("")
 
-        # LLM response
-        parts.append("--- LLM RESPONSE ---")
+        # ---- <LLM Response> ----
+        parts.append("<LLM Response>")
         parts.append(llm_response if llm_response is not None else "(no response / error)")
+        parts.append("</LLM Response>")
         parts.append("")
 
-        # Edit application
-        parts.append("--- EDIT RESULT ---")
+        # ---- <Result> ----
+        parts.append("<Result>")
+        parts.append(f"Tokens: in={tokens_in}, out={tokens_out}")
+
         if edit_result is None:
-            parts.append("FAILED to apply edits")
+            parts.append("Edits: FAILED to apply")
         else:
-            parts.append(f"Successfully applied (new code: {len(edit_result)} chars)")
-        parts.append("")
+            parts.append(f"Edits: applied ({len(edit_result)} chars)")
 
-        # Safety
         if safety_ok is not None:
-            parts.append("--- SAFETY CHECK ---")
-            parts.append(f"Safe: {safety_ok}")
-            if safety_reason:
-                parts.append(f"Reason: {safety_reason}")
-            parts.append("")
+            if safety_ok:
+                parts.append("Safety: PASSED")
+            else:
+                parts.append(f"Safety: FAILED — {safety_reason}")
 
-        # Verus
         if verus_verified is not None:
-            parts.append("--- VERUS RESULT ---")
-            parts.append(f"Verified: {verus_verified}")
-            if verus_errors:
-                parts.append(verus_errors)
-            parts.append("")
+            if verus_verified:
+                parts.append("Verus: VERIFIED")
+            else:
+                parts.append("Verus: FAILED")
+                if verus_errors:
+                    parts.append(verus_errors)
+        elif verus_errors:
+            parts.append(f"Note: {verus_errors}")
 
-        (d / f"attempt-{attempt}.txt").write_text("\n".join(parts), encoding="utf-8")
+        parts.append("</Result>")
 
-        # Also save the raw LLM response separately for easy inspection
-        if llm_response is not None:
-            (d / f"attempt-{attempt}-response.txt").write_text(llm_response, encoding="utf-8")
-
-        # Save the code state after this attempt
-        if edit_result is not None:
-            (d / f"attempt-{attempt}-code.rs").write_text(edit_result, encoding="utf-8")
+        (d / f"attempt-{attempt}.md").write_text("\n".join(parts), encoding="utf-8")
 
     except Exception:
         pass
