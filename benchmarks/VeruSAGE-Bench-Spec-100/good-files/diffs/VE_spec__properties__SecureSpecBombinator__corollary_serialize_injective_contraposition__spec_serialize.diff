@@ -1,0 +1,41 @@
+--- ground-truth/VE_spec__properties__SecureSpecBombinator__corollary_serialize_injective_contraposition__spec_serialize.rs
++++ tasks/VE_spec__properties__SecureSpecBombinator__corollary_serialize_injective_contraposition__spec_serialize.rs
+@@ -22,37 +22,11 @@
+     spec fn spec_serialize(&self, v: Self::Type) -> Seq<u8>;
+ 
+ }
+ 
+ pub trait SecureSpecCombinator: SpecCombinator {
+-
+-    spec fn is_prefix_secure() -> bool;
+-
+-	#[verifier::external_body]
+-    proof fn theorem_serialize_parse_roundtrip(&self, v: Self::Type)
+-        requires
+-            self.requires(),
+-        ensures
+-            self.wf(v) ==> self.spec_parse(self.spec_serialize(v)) == Some(
+-                (self.spec_serialize(v).len() as int, v),
+-            ),
+-	{
+-		unimplemented!()
+-	}
+-
+-    proof fn corollary_serialize_injective_contraposition(&self, v1: Self::Type, v2: Self::Type)
+-        requires
+-            self.requires(),
+-        ensures
+-            self.wf(v1) && self.wf(v2) ==> v1 != v2 ==> self.spec_serialize(v1)
+-                != self.spec_serialize(v2),
+-    {
+-        self.theorem_serialize_parse_roundtrip(v1);
+-        self.theorem_serialize_parse_roundtrip(v2);
+-    }
+-
+-
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ 
+ 
+ 

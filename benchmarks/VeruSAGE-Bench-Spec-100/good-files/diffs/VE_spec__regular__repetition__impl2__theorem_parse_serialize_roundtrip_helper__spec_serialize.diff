@@ -1,0 +1,34 @@
+--- ground-truth/VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip_helper__spec_serialize.rs
++++ tasks/VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip_helper__spec_serialize.rs
+@@ -23,30 +23,11 @@
+ 
+ }
+ 
+ 
+ pub trait SecureSpecCombinator: SpecCombinator {
+-
+-    proof fn theorem_parse_serialize_roundtrip(&self, buf: Seq<u8>)
+-        requires
+-            self.requires(),
+-        ensures
+-            self.spec_parse(buf) matches Some((n, v)) ==> {
+-                &&& self.wf(v)
+-                &&& self.spec_serialize(v) == buf.take(n)
+-            },
+-            ;
+-
+-    spec fn is_prefix_secure() -> bool;
+-
+-    proof fn lemma_parse_length(&self, s: Seq<u8>)
+-        requires
+-            self.requires(),
+-        ensures
+-            self.spec_parse(s) matches Some((n, _)) ==> 0 <= n <= s.len(),
+-            ;
+-
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ // File: src/regular/repetition.rs
+ pub struct RepeatN<C>(pub C, pub usize);
+ 

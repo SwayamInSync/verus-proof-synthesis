@@ -4,11 +4,11 @@ fn main() {}
 
 verus! {
 
-fn contains(arr: &Vec<i32>, key: i32) -> (result: bool)
+fn (arr: &Vec<i32>, key: i32) -> (result: bool)
     ensures
         result == (exists|i: int| 0 <= i < arr.len() && (arr[i] == key)),
 {
-    let mut i = 0;
+    let mut i = contains0;
     while i < arr.len() {
         if (arr[i] == key) {
             return true;

@@ -1,0 +1,16 @@
+--- ground-truth/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__handle_get_request_msg.rs
++++ tasks/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__handle_get_request_msg.rs
+@@ -3220,12 +3220,11 @@
+ 
+ pub open spec fn handle_get_request_msg(msg: Message, s: APIServerState) -> (APIServerState, Message)
+     recommends
+         msg.content.is_get_request(),
+ {
+-    let req = msg.content.get_get_request();
+-    (s, form_get_resp_msg(msg, handle_get_request(req, s)))
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ pub open spec fn handle_list_request_msg(msg: Message, s: APIServerState) -> (APIServerState, Message)
+     recommends
+         msg.content.is_list_request(),

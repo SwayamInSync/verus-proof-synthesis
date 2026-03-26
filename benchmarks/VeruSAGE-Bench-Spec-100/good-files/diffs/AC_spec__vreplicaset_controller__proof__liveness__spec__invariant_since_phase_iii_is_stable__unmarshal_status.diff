@@ -1,0 +1,61 @@
+--- ground-truth/AC_spec__vreplicaset_controller__proof__liveness__spec__invariant_since_phase_iii_is_stable__unmarshal_status.rs
++++ tasks/AC_spec__vreplicaset_controller__proof__liveness__spec__invariant_since_phase_iii_is_stable__unmarshal_status.rs
+@@ -64,56 +64,12 @@
+ 
+ }
+ 
+ 
+ macro_rules! implement_resource_view_trait {
+-    ($t:ty, $spec_t:ty, $spec_default:expr, $status_t:ty, $status_default:expr, $kind:expr, $state_validation:ident, $transition_validation:ident) => {
+-        verus! {
+-
+-        impl ResourceView for $t {
+-
+-            type Spec = $spec_t;
+-
+-            type Status = $status_t;
+-
+-            open spec fn metadata(self) -> ObjectMetaView {
+-                self.metadata
+-            }
+-
+-            open spec fn kind() -> Kind {
+-                $kind
+-            }
+-
+-            open spec fn object_ref(self) -> ObjectRef {
+-                ObjectRef {
+-                    kind: Self::kind(),
+-                    name: self.metadata().name->0,
+-                    namespace: self.metadata().namespace->0,
+-                }
+-            }
+-
+-            open spec fn unmarshal(obj: DynamicObjectView) -> Result<Self, UnmarshalError> {
+-                if obj.kind != Self::kind() {
+-                    Err(())
+-                } else if !(Self::unmarshal_spec(obj.spec) is Ok) {
+-                    Err(())
+-                } else if !(Self::unmarshal_status(obj.status) is Ok) {
+-                    Err(())
+-                } else {
+-                    Ok(Self {
+-                        metadata: obj.metadata,
+-                        spec: Self::unmarshal_spec(obj.spec)->Ok_0,
+-                        status: Self::unmarshal_status(obj.status)->Ok_0,
+-                    })
+-                }
+-            }
+-
+-            uninterp spec fn unmarshal_spec(v: Value) -> Result<Self::Spec, UnmarshalError>;
+-
+-            uninterp spec fn unmarshal_status(v: Value) -> Result<Self::Status, UnmarshalError>;
+-
+-}}}}
++    arbitrary() // TODO: fill in the spec body
++}
+ 
+ 
+ 
+ 
+ // File: kubernetes_cluster/spec/api_server/types.rs

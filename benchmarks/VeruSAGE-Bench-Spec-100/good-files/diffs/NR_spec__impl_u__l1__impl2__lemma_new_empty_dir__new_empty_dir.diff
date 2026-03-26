@@ -1,0 +1,20 @@
+--- ground-truth/NR_spec__impl_u__l1__impl2__lemma_new_empty_dir__new_empty_dir.rs
++++ tasks/NR_spec__impl_u__l1__impl2__lemma_new_empty_dir__new_empty_dir.rs
+@@ -210,16 +210,11 @@
+         recommends
+             //self.inv(),
+             entry < self.num_entries(),
+             self.layer + 1 < self.arch.layers.len(),
+     {
+-        Directory {
+-            entries:    new_seq(self.arch.num_entries((self.layer + 1) as nat), NodeEntry::Invalid),
+-            layer:      self.layer + 1,
+-            base_vaddr: self.entry_base(entry),
+-            arch:       self.arch,
+-        }
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     pub proof fn lemma_new_empty_dir(self, entry: nat)
+         requires
+             self.inv(),

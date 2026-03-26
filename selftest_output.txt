@@ -1,0 +1,177 @@
+Self-test: 99 tasks with ground truth bodies
+
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AL_spec__always_p_is_stable__stable                                    S1=PASS S2=PASS
+  OS_spec__kernel__create_and_map_pages__impl0__alloc_and_map__spec_inde S1=PASS S2=PASS
+  OS_spec__kernel__create_and_map_pages__impl0__alloc_and_map__spec_va2i S1=PASS S2=PASS
+  IR_spec__host_impl_v__impl2__host_model_next_delegate__abstractify_end S1=PASS S2=PASS
+  IR_spec__host_impl_v__impl2__host_noreceive_noclock_next__flatten_sets S1=PASS S2=PASS
+  IR_spec__host_impl_v__impl2__deliver_packet_seq__abstractify_cpacket_t S1=PASS S2=PASS
+  MA_spec__bin_sizes__idx_in_range_has_bin_size__pfd_upper               S1=PASS S2=PASS
+  NO_spec__spec__unbounded_log_refines_simplelog__state_at_version_refin S1=PASS S2=PASS
+  NR_spec__impl_u__os_refinement__lemma_map_soundness_equality__effectiv S1=PASS S2=PASS
+  NR_spec__impl_u__os_refinement__interp_vmem_subrange__interp_vmem      S1=PASS S2=PASS
+  ST_spec__subregion_new3__get_subregion_view                            S1=PASS S2=PASS
+  VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip S1=PASS S2=PASS
+    [debug] S2 harness → temp2/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__default_s2_harness.rs
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=FAIL
+    S2: error: aborting due to 24 previous errors
+Some errors have detailed explanations: E0407, E0425.
+For more information abo
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+    [debug] S2 harness → temp2/AL_spec__a_to_temp_pred_equality__new_s2_harness.rs
+  AL_spec__a_to_temp_pred_equality__new                                  S1=PASS S2=FAIL
+    S2: |                           ++++++
+error: aborting due to 2 previous errors
+For more information about this error, try `
+  OS_spec__kernel__syscall_new_thread_with_endpoint__impl0__syscall_new_ S1=PASS S2=PASS
+  OS_spec__kernel__create_and_map_pages__impl0__alloc_and_map__spec_get_ S1=PASS S2=PASS
+    [debug] S2 harness → temp2/IR_spec__host_impl_v__impl2__host_model_next_get_request__ack_state_lookup_s2_harness.rs
+  IR_spec__host_impl_v__impl2__host_model_next_get_request__ack_state_lo S1=PASS S2=FAIL
+    S2: 1248 | proof fn ack_state_lookup__equiv<MT>(checked)
+|                                     ^^^^^^^^^
+error: aborting due
+    [debug] S2 harness → temp2/IR_spec__host_impl_v__impl2__host_model_receive_packet__truncate_un_ack_list_s2_harness.rs
+  IR_spec__host_impl_v__impl2__host_model_receive_packet__truncate_un_ac S1=PASS S2=FAIL
+    S2: 1103 | proof fn truncate_un_ack_list__equiv<MT>(checked)
+|                                         ^^^^^^^^^
+error: abor
+    [debug] S2 harness → temp2/IR_spec__host_impl_v__impl2__host_noreceive_noclock_next__ignore_unparseable_packet_s2_harness.rs
+  IR_spec__host_impl_v__impl2__host_noreceive_noclock_next__ignore_unpar S1=PASS S2=FAIL
+    S2: 1393 | proof fn ignore_unparseable_packet__equiv(checked)
+|                                          ^^^^^^^^^
+error: ab
+  IR_spec__host_impl_v__impl2__deliver_packet_seq__optional_value_view   S1=PASS S2=PASS
+  MA_spec__layout__block_ptr_aligned_to_word__is_block_ptr               S1=PASS S2=PASS
+  NO_spec__spec__utils__map_new_rec_dom_finite__map_new_rec              S1=PASS S2=PASS
+  NR_spec__spec_t__mmu__rl2__lemma_iter_walk_result_vbase_equal__vaddr   S1=PASS S2=PASS
+    [debug] S2 harness → temp2/NR_spec__impl_u__os_refinement__interp_vmem_subrange__base_and_pte_for_vaddr_s2_harness.rs
+  NR_spec__impl_u__os_refinement__interp_vmem_subrange__base_and_pte_for S1=PASS S2=FAIL
+    S2: |                                                                 ++++++
+error: aborting due to 2 previous errors
+For mo
+    [debug] S2 harness → temp2/NR_spec__spec_t__mmu__rl2__lemma_iter_walk_result_vbase_equal__from_bits_s2_harness.rs
+  NR_spec__spec_t__mmu__rl2__lemma_iter_walk_result_vbase_equal__from_bi S1=PASS S2=FAIL
+    S2: |                                                      ++++++
+error: aborting due to 2 previous errors
+For more informat
+  ST_spec__append_L_tentatively_append__log_area_offset_to_relative_log_ S1=PASS S2=PASS
+  ST_spec__subregion_new__chunk_corresponds_ignoring_outstanding_writes  S1=PASS S2=PASS
+  VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip S1=PASS S2=SKIP
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__helper_invariants__proof__lemm S1=PASS S2=SKIP
+  AC_spec__vreplicaset_controller__proof__helper_invariants__proof__lemm S1=PASS S2=SKIP
+    [debug] S2 harness → temp2/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__unmarshal_s2_harness.rs
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=FAIL
+    S2: error: aborting due to 20 previous errors
+Some errors have detailed explanations: E0407, E0425.
+For more information abo
+  OS_spec__kernel__create_and_map_pages__impl0__alloc_and_map__spec_usiz S1=PASS S2=PASS
+  OS_spec__kernel__syscall_new_container__impl0__syscall_new_container_w S1=PASS S2=PASS
+  OS_spec__kernel__syscall_new_proc__impl0__syscall_new_proc_with_endpoi S1=PASS S2=PASS
+  OS_spec__process_manager__container_tree__new_container_preserve_tree_ S1=PASS S2=PASS
+  OS_spec__kernel__create_and_map_pages__impl0__alloc_and_map__spec_set_ S1=PASS S2=PASS
+  IR_spec__host_impl_v__impl2__deliver_packet_seq__abstractify_net_event S1=PASS S2=PASS
+  IR_spec__host_impl_v__impl2__host_model_next_delegate__view            S1=PASS S2=PASS
+  IR_spec__verus_extra__map_finite__set_fold                             S1=PASS S2=PASS
+  MA_spec__bin_sizes__result_sbin__smallest_sbin_fitting_size            S1=PASS S2=PASS
+  MA_spec__bin_sizes__result_sbin__check_sbin                            S1=PASS S2=PASS
+  NO_spec__spec__unbounded_log__combiner_request_ids_finite__queued_ops  S1=PASS S2=PASS
+  NR_spec__impl_u__l1__impl2__lemma_new_empty_dir__new_empty_dir         S1=PASS S2=PASS
+  NR_spec__impl_u__os_refinement__interp_vmem_subrange__applied_mappings S1=PASS S2=PASS
+  NR_spec__impl_u__os_refinement__interp_vmem_subrange__interp           S1=PASS S2=PASS
+  NR_spec__spec_t__os_invariant__init_implies_tlb_inv__is_unmapping      S1=PASS S2=PASS
+  ST_spec__append_L_tentatively_append__relative_log_pos_to_log_area_off S1=PASS S2=PASS
+    [debug] S2 harness → temp2/VE_spec__regular__leb128__impl2__lemma_serialize_last_byte_high_8_bit_not_set__spec_serialize_helper_s2_harness.rs
+  VE_spec__regular__leb128__impl2__lemma_serialize_last_byte_high_8_bit_ S1=PASS S2=FAIL
+    S2: |                                          ++++++
+error: aborting due to 3 previous errors
+For more information about th
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_st S1=PASS S2=PASS
+    [debug] S2 harness → temp2/AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_stable_reconciliation_holds_per_cr__pending_req_in_flight_or_resp_in_flight_at_reconcile_state_s2_harness.rs
+  AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_st S1=PASS S2=FAIL
+    S2: |                                                                                                           ++++++
+error
+  AC_spec__vreplicaset_controller__proof__helper_lemmas__only_interferes S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+  OS_spec__kernel__syscall_new_container__impl0__syscall_new_container_w S1=PASS S2=PASS
+  OS_spec__kernel__syscall_mmap__impl0__syscall_mmap__syscall_mmap_retur S1=PASS S2=PASS
+  OS_spec__allocator__page_allocator_spec_impl__impl1__free_pages_are_no S1=PASS S2=PASS
+  OS_spec__kernel__create_and_map_pages__impl0__alloc_and_map__spec_reso S1=PASS S2=PASS
+  OS_spec__kernel__mem_util__impl0__create_entry__spec_resolve_mapping_1 S1=PASS S2=PASS
+  OS_spec__allocator__page_allocator_spec_impl__impl1__free_pages_are_no S1=PASS S2=PASS
+    [debug] S2 harness → temp2/IR_spec__host_impl_v__impl2__host_model_next_delegate__next_delegate_s2_harness.rs
+  IR_spec__host_impl_v__impl2__host_model_next_delegate__next_delegate   S1=PASS S2=FAIL
+    S2: 1185 | proof fn next_delegate__equiv(checked)
+|                              ^^^^^^^^^
+error: aborting due to 1 previous
+    [debug] S2 harness → temp2/IR_spec__host_impl_v__impl2__host_model_next_receive_message__next_shard_wrapper_s2_harness.rs
+  IR_spec__host_impl_v__impl2__host_model_next_receive_message__next_sha S1=PASS S2=FAIL
+    S2: 1377 | proof fn next_shard_wrapper__equiv(checked)
+|                                   ^^^^^^^^^
+error: aborting due to 
+  MA_spec__bin_sizes__bin_size_result__smallest_bin_fitting_size         S1=PASS S2=PASS
+  NO_spec__spec__linearization__trick_equiv__behavior_equiv              S1=PASS S2=PASS
+  NR_spec__spec_t__os_invariant__init_implies_tlb_inv__init              S1=PASS S2=PASS
+  NR_spec__spec_t__os_invariant__lemma_insert_no_overlap_preserves_no_ov S1=PASS S2=PASS
+  NR_spec__impl_u__os_refinement__lemma_inflight_vaddr_implies_hl_unmap_ S1=PASS S2=PASS
+  NR_spec__spec_t__mmu__rl2__lemma_iter_walk_result_vbase_equal__flags   S1=PASS S2=PASS
+  VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip S1=PASS S2=SKIP
+  VE_spec__regular__repetition__impl2__lemma_parse_length_helper__spec_p S1=PASS S2=SKIP
+    [debug] S1 patched → temp2/AC_spec__vreplicaset_controller__proof__liveness__spec__invariant_since_phase_iii_is_stable__unmarshal_status_s1_patched.rs
+  AC_spec__vreplicaset_controller__proof__liveness__spec__invariant_sinc S1=FAIL S2=SKIP
+    S1: 1089 | }
+|  ^
+error: aborting due to 1 previous error
+    [debug] S1 patched → temp2/AC_spec__vreplicaset_controller__proof__liveness__spec__invariant_since_phase_i_is_stable__spec_s1_patched.rs
+  AC_spec__vreplicaset_controller__proof__liveness__spec__invariant_sinc S1=FAIL S2=SKIP
+    S1: 792 | }
+|  ^
+error: aborting due to 1 previous error
+    [debug] S1 patched → temp2/AC_spec__vreplicaset_controller__proof__helper_lemmas__only_interferes_with_itself_equivalent_to_lifted_only_interferes_with_itself_action__kind_s1_patched.rs
+  AC_spec__vreplicaset_controller__proof__helper_lemmas__only_interferes S1=FAIL S2=SKIP
+    S1: 829 | }
+|  ^
+error: aborting due to 1 previous error
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+    [debug] S2 harness → temp2/OS_spec__process_manager__impl_base__impl0__block_running_thread_and_change_queue_state__processes_container_wf_s2_harness.rs
+  OS_spec__process_manager__impl_base__impl0__block_running_thread_and_c S1=PASS S2=FAIL
+    S2: 1410 | |             ).queue.len() < MAX_NUM_THREADS_PER_ENDPOINT,
+| |_____________^
+error: aborting due to 1 previous e
+  OS_spec__pagetable__pagetable_impl_base__impl0__create_entry_l2__wf_ma S1=PASS S2=PASS
+  OS_spec__process_manager__container_tree__new_container_preserve_tree_ S1=PASS S2=PASS
+    [debug] S2 harness → temp2/IR_spec__host_impl_v__impl2__effect_of_delegation_map_set__cmp_spec_s2_harness.rs
+  IR_spec__host_impl_v__impl2__effect_of_delegation_map_set__cmp_spec    S1=PASS S2=FAIL
+    S2: error: aborting due to 14 previous errors
+Some errors have detailed explanations: E0401, E0425.
+For more information abo
+  MA_spec__layout__block_ptr_aligned_to_word__is_block_ptr1              S1=PASS S2=PASS
+    [debug] S2 harness → temp2/NO_spec__spec__unbounded_log__LogRangeMatchesQueue_append__LogRangeMatchesQueue_s2_harness.rs
+  NO_spec__spec__unbounded_log__LogRangeMatchesQueue_append__LogRangeMat S1=PASS S2=FAIL
+    S2: 143 | ...ngeMatchesQueue(queue, log, queueIndex, logIndexLower, logIndexUpper, nodeId, updates) <==> LogRangeMatchesQueu
+  NR_spec__spec_t__mmu__rl2__lemma_iter_walk_result_vbase_equal__result  S1=PASS S2=PASS
+  NR_spec__impl_u__os_refinement__lemma_unmap_soundness_equality__inflig S1=PASS S2=PASS
+  ST_spec__append_L_tentatively_append_wrapping__info_consistent_with_lo S1=PASS S2=PASS
+  VE_spec__properties__SecureSpecBombinator__corollary_serialize_injecti S1=PASS S2=SKIP
+  AL_spec__always_implies_forall_intro__tla_forall                       S1=PASS S2=PASS
+  AL_spec__leads_to_exists_intro__tla_exists                             S1=PASS S2=PASS
+  AL_spec__always_and_equality__always                                   S1=PASS S2=PASS
+  AL_spec__eventually_propagate_backwards__eventually_choose_witness     S1=PASS S2=PASS
+  AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition S1=PASS S2=PASS
+    [debug] S2 harness → temp2/AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_stable_reconciliation_holds_per_cr__request_sent_by_controller_with_key_s2_harness.rs
+  AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_st S1=PASS S2=FAIL
+    S2: |                                                                           ++++++
+error: aborting due to 2 previous err
+  AC_spec__vreplicaset_controller__proof__helper_invariants__proof__lemm S1=PASS S2=SKIP
+
+============================================================
+Stage 1: 96/99 pass, 3 fail
+Stage 2: 73 pass, 16 fail, 10 skip

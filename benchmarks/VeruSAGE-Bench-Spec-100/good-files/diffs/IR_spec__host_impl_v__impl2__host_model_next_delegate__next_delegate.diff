@@ -1,0 +1,30 @@
+--- ground-truth/IR_spec__host_impl_v__impl2__host_model_next_delegate__next_delegate.rs
++++ tasks/IR_spec__host_impl_v__impl2__host_model_next_delegate__next_delegate.rs
+@@ -1139,26 +1139,11 @@
+ pub open spec(checked) fn next_delegate(pre: AbstractHostState, post: AbstractHostState, pkt: Packet, out: Set<Packet>) -> bool
+     recommends
+         pkt.msg is Message,
+         pre.delegation_map.is_complete(),
+ {
+-    &&& pkt.msg.arrow_Message_m() is Delegate
+-    &&& if pre.constants.host_ids.contains(pkt.src) {
+-            let m = pkt.msg.arrow_Message_m();
+-            &&& post.delegation_map == pre.delegation_map.update(m.arrow_Delegate_range(), pre.constants.me)
+-            &&& post.h == bulk_update_hashtable(pre.h, m.arrow_Delegate_range(), m.arrow_Delegate_h())
+-            &&& post.num_delegations == pre.num_delegations + 1
+-        }
+-        else  {
+-            &&& post.delegation_map == pre.delegation_map
+-            &&& post.h == pre.h
+-            &&& post.num_delegations == pre.num_delegations
+-        }
+-    &&& SingleDelivery::<Message>::send_no_message(pre.sd, post.sd)
+-    &&& SingleDelivery::<Message>::receive_no_message(pre.sd, post.sd)
+-    &&& out == Set::<Packet>::empty()
+-    &&& post.received_requests == pre.received_requests
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ 
+ // File: io_t.rs
+ #[derive(PartialEq, Eq, Hash)]

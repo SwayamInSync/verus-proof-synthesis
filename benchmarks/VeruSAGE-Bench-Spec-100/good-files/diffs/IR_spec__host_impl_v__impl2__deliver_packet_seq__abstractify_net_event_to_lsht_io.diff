@@ -1,0 +1,24 @@
+--- ground-truth/IR_spec__host_impl_v__impl2__deliver_packet_seq__abstractify_net_event_to_lsht_io.rs
++++ tasks/IR_spec__host_impl_v__impl2__deliver_packet_seq__abstractify_net_event_to_lsht_io.rs
+@@ -833,20 +833,11 @@
+ }
+ 
+ pub open spec fn abstractify_net_event_to_lsht_io(evt: NetEvent) -> LSHTIo
+     recommends net_event_is_abstractable(evt)
+ {
+-    match evt {
+-        LIoOp::<AbstractEndPoint, Seq<u8>>::Send{s} =>
+-          LIoOp::<AbstractEndPoint, SingleMessage<Message>>::Send{ s: abstractify_net_packet_to_lsht_packet(s) },
+-        LIoOp::<AbstractEndPoint, Seq<u8>>::Receive{r} =>
+-          LIoOp::<AbstractEndPoint, SingleMessage<Message>>::Receive{ r: abstractify_net_packet_to_lsht_packet(r) },
+-        LIoOp::<AbstractEndPoint, Seq<u8>>::TimeoutReceive{} =>
+-          LIoOp::<AbstractEndPoint, SingleMessage<Message>>::TimeoutReceive{},
+-        LIoOp::<AbstractEndPoint, Seq<u8>>::ReadClock{t} =>
+-          LIoOp::<AbstractEndPoint, SingleMessage<Message>>::ReadClock{ t: t as int },
+-    }
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ pub open spec fn abstractify_net_packet_to_sht_packet(net: NetPacket) -> Packet
+     recommends net_packet_is_abstractable(net)
+ {

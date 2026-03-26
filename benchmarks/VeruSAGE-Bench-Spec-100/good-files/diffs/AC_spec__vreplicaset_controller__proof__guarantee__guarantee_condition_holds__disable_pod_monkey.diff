@@ -1,0 +1,25 @@
+--- ground-truth/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__disable_pod_monkey.rs
++++ tasks/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__disable_pod_monkey.rs
+@@ -1756,21 +1756,11 @@
+             },
+         }
+     }
+ 
+     pub open spec fn disable_pod_monkey(self) -> Action<ClusterState, (), ()> {
+-        Action {
+-            precondition: |input:(), s: ClusterState| {
+-                true
+-            },
+-            transition: |input: (), s: ClusterState| {
+-                (ClusterState {
+-                    pod_monkey_enabled: false,
+-                    ..s
+-                }, ())
+-            }
+-        }
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     pub open spec fn external_next(self) -> Action<ClusterState, (int, Option<Message>), ()> {
+         Action {
+             precondition: |input: (int, Option<Message>), s: ClusterState| {

@@ -1,0 +1,20 @@
+--- ground-truth/OS_spec__kernel__syscall_new_proc__impl0__syscall_new_proc_with_endpoint__get_return_vaule_pair_usize.rs
++++ tasks/OS_spec__kernel__syscall_new_proc__impl0__syscall_new_proc_with_endpoint__get_return_vaule_pair_usize.rs
+@@ -2013,16 +2013,11 @@
+ }
+ 
+ impl SyscallReturnStruct {
+ 
+     pub open spec fn get_return_vaule_pair_usize(&self) -> Option<(usize, usize)> {
+-        match self.error_code {
+-            RetValueType::SuccessPairUsize { value1: value1, value2: value2 } => Some(
+-                (value1, value2),
+-            ),
+-            _ => None,
+-        }
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     pub open spec fn spec_is_error(&self) -> bool {
+         match self.error_code {
+             RetValueType::Error => true,

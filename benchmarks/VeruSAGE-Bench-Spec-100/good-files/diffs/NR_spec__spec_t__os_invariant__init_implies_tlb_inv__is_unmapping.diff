@@ -1,0 +1,21 @@
+--- ground-truth/NR_spec__spec_t__os_invariant__init_implies_tlb_inv__is_unmapping.rs
++++ tasks/NR_spec__spec_t__os_invariant__init_implies_tlb_inv__is_unmapping.rs
+@@ -397,17 +397,11 @@
+             _ => false,
+         }
+     }
+ 
+     pub open spec fn is_unmapping(self) -> bool {
+-        match self {
+-            CoreState::UnmapWaiting { .. }
+-            | CoreState::UnmapExecuting { .. }
+-            | CoreState::UnmapOpDone { .. }
+-            | CoreState::UnmapShootdownWaiting { .. } => true,
+-            _ => false,
+-        }
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     pub open spec fn unmap_vaddr(self) -> nat
+         recommends self.is_unmapping()
+     {

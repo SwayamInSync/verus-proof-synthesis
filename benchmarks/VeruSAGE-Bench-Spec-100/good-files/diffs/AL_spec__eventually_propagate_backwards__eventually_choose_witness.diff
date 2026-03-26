@@ -1,0 +1,16 @@
+--- ground-truth/AL_spec__eventually_propagate_backwards__eventually_choose_witness.rs
++++ tasks/AL_spec__eventually_propagate_backwards__eventually_choose_witness.rs
+@@ -64,12 +64,11 @@
+ }
+ 
+ spec fn eventually_choose_witness<T>(ex: Execution<T>, p: TempPred<T>) -> nat
+     recommends exists |i| p.satisfied_by(#[trigger] ex.suffix(i)),
+ {
+-    let witness = choose |i| p.satisfied_by(#[trigger] ex.suffix(i));
+-    witness
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ 	#[verifier::external_body]
+ pub proof fn execution_equality<T>(ex1: Execution<T>, ex2: Execution<T>)
+     requires forall |i: nat| #[trigger] (ex1.nat_to_state)(i) == (ex2.nat_to_state)(i),

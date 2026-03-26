@@ -1,0 +1,22 @@
+--- ground-truth/VE_spec__regular__leb128__impl2__lemma_serialize_last_byte_high_8_bit_not_set__spec_serialize_helper.rs
++++ tasks/VE_spec__regular__leb128__impl2__lemma_serialize_last_byte_high_8_bit_not_set__spec_serialize_helper.rs
+@@ -80,18 +80,11 @@
+ 
+     pub open spec fn spec_serialize_helper(v: UInt) -> Seq<u8>
+         decreases v,
+         via Self::spec_serialize_decreases
+     {
+-        let lo = take_low_7_bits!(v);
+-        let hi = v >> 7;
+-
+-        if hi == 0 {
+-            seq![lo]
+-        } else {
+-            seq![set_high_8_bit!(lo)] + Self::spec_serialize_helper(hi)
+-        }
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     #[via_fn]
+     proof fn spec_serialize_decreases(v: UInt) {
+         assert(v >> 7 != 0 ==> v >> 7 < v) by (bit_vector);

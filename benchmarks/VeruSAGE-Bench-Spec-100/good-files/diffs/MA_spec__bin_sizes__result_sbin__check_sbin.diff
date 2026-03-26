@@ -1,0 +1,20 @@
+--- ground-truth/MA_spec__bin_sizes__result_sbin__check_sbin.rs
++++ tasks/MA_spec__bin_sizes__result_sbin__check_sbin.rs
+@@ -204,16 +204,11 @@
+ }
+ 
+ spec fn check_sbin(size_start:int, size_end:int) -> bool
+     decreases size_end - size_start,
+ {
+-   if size_start >= size_end {
+-       true
+-   } else {
+-          property_sbin(size_start)
+-       && check_sbin(size_start + 1, size_end)
+-   }
++   arbitrary() // TODO: fill in the spec body
+ }
+ 
+ proof fn result_sbin(size_start:int, size_end:int)
+     ensures
+         check_sbin(size_start, size_end) ==>

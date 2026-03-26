@@ -1,0 +1,24 @@
+--- ground-truth/NR_spec__impl_u__os_refinement__interp_vmem_subrange__interp.rs
++++ tasks/NR_spec__impl_u__os_refinement__interp_vmem_subrange__interp.rs
+@@ -76,20 +76,11 @@
+ pub mod refinement {
+ 
+     impl crate::rl2::State {
+ 
+         pub open spec fn interp(self) -> crate::rl1::State {
+-            crate::rl1::State {
+-                happy: self.happy,
+-                pt_mem: self.writer_mem(),
+-                phys_mem: self.phys_mem,
+-                tlbs: self.tlbs,
+-                writes: self.writes,
+-                pending_maps: self.hist.pending_maps,
+-                pending_unmaps: self.hist.pending_unmaps,
+-                polarity: self.polarity,
+-            }
++            arbitrary() // TODO: fill in the spec body
+         }
+     }
+ }
+ 
+ }

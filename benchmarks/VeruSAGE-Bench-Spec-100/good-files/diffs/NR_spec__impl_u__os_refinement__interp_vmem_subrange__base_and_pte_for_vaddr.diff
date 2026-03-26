@@ -1,0 +1,17 @@
+--- ground-truth/NR_spec__impl_u__os_refinement__interp_vmem_subrange__base_and_pte_for_vaddr.rs
++++ tasks/NR_spec__impl_u__os_refinement__interp_vmem_subrange__base_and_pte_for_vaddr.rs
+@@ -341,13 +341,11 @@
+             applied_mappings.contains_pair(base, pte)
+             && crate::defs::between(vaddr as nat, base, base + pte.frame.size)
+     }
+ 
+     pub open spec fn base_and_pte_for_vaddr(applied_mappings: Map<nat, PTE>, vaddr: int) -> (nat, PTE) {
+-        choose|base: nat, pte: PTE| #![auto]
+-            applied_mappings.contains_pair(base, pte)
+-            && crate::defs::between(vaddr as nat, base, base + pte.frame.size)
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     pub open spec fn vmem_apply_mappings(
+         applied_mappings: Map<nat, PTE>,
+         phys_mem: Seq<u8>

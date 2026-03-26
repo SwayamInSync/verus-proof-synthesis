@@ -1,0 +1,39 @@
+--- ground-truth/MA_spec__layout__block_ptr_aligned_to_word__is_block_ptr1.rs
++++ tasks/MA_spec__layout__block_ptr_aligned_to_word__is_block_ptr1.rs
+@@ -113,35 +113,11 @@
+     &&& ptr@.metadata == ()
+     &&& is_block_ptr1(ptr as int, block_id)
+ }
+ 
+ pub open spec fn is_block_ptr1(ptr: int, block_id: BlockId) -> bool {
+-    // ptr should be in the range (segment start, segment end]
+-    // Yes, that's open at the start and closed at the end
+-    //  - segment start is invalid since that's where the SegmentHeader is
+-    //  - segment end is valid because there might be a huge block there
+-    &&& segment_start(block_id.page_id.segment_id) < ptr
+-        <= segment_start(block_id.page_id.segment_id) + (SEGMENT_SIZE as int)
+-        < usize::MAX
+-
+-    // Has valid slice_idx (again this is <= to account for the huge slice)
+-    &&& 0 <= block_id.slice_idx <= SLICES_PER_SEGMENT
+-
+-    // It also has to be in the right slice
+-    &&& segment_start(block_id.page_id.segment_id) + (block_id.slice_idx * SLICE_SIZE)
+-        <= ptr
+-        < segment_start(block_id.page_id.segment_id) + (block_id.slice_idx * SLICE_SIZE)
+-              + SLICE_SIZE
+-
+-    // the pptr should actually agree with the block_id
+-    &&& ptr == block_start(block_id)
+-
+-    &&& 0 <= block_id.page_id.segment_id.id
+-
+-    // The block size must be a multiple of the word size
+-    &&& block_id.block_size >= size_of::<Node>()
+-    &&& block_id.block_size % size_of::<Node>() == 0
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ pub proof fn block_ptr_aligned_to_word()
+     ensures forall |p, block_id| is_block_ptr(p, block_id) ==>
+         p as int % align_of::<Node>() as int == 0

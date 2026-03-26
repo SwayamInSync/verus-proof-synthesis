@@ -1,0 +1,30 @@
+--- ground-truth/AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_stable_reconciliation_holds_per_cr__invariants_since_phase_n.rs
++++ tasks/AC_spec__vreplicaset_controller__proof__liveness__proof__eventually_stable_reconciliation_holds_per_cr__invariants_since_phase_n.rs
+@@ -4539,26 +4539,11 @@
+ 	{
+ 		unimplemented!()
+ 	}
+ 
+ pub open spec fn invariants_since_phase_n(n: nat, vrs: VReplicaSetView, cluster: Cluster, controller_id: int) -> TempPred<ClusterState> {
+-    if n == 0 {
+-        invariants(vrs, cluster, controller_id)
+-        .and(always(lift_state(Cluster::desired_state_is(vrs))))
+-    } else if n == 1 {
+-        invariants_since_phase_i(controller_id, vrs)
+-    } else if n == 2 {
+-        invariants_since_phase_ii(controller_id, vrs)
+-    } else if n == 3 {
+-        invariants_since_phase_iii(vrs, cluster, controller_id)
+-    } else if n == 4 {
+-        invariants_since_phase_iv(vrs, cluster, controller_id)
+-    } else if n == 5 {
+-        invariants_since_phase_v(vrs, cluster, controller_id)
+-    } else {
+-        true_pred()
+-    }
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ pub open spec fn spec_before_phase_n(n: nat, vrs: VReplicaSetView, cluster: Cluster, controller_id: int) -> TempPred<ClusterState>
+     decreases n,
+ {

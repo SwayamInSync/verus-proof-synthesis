@@ -1,0 +1,37 @@
+--- ground-truth/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__restart_controller.rs
++++ tasks/AC_spec__vreplicaset_controller__proof__guarantee__guarantee_condition_holds__restart_controller.rs
+@@ -1634,33 +1634,11 @@
+             }
+         }
+     }
+ 
+     pub open spec fn restart_controller(self) -> Action<ClusterState, int, ()> {
+-        Action {
+-            precondition: |input: int, s: ClusterState| {
+-                let controller_id = input;
+-                &&& self.controller_models.contains_key(controller_id)
+-                &&& s.controller_and_externals[controller_id].crash_enabled
+-            },
+-            transition: |input: int, s: ClusterState| {
+-                let controller_id = input;
+-                let controller_and_external_state = s.controller_and_externals[controller_id];
+-                let controller_and_external_state_prime = ControllerAndExternalState {
+-                    controller: ControllerState {
+-                        scheduled_reconciles: Map::<ObjectRef, DynamicObjectView>::empty(),
+-                        ongoing_reconciles: Map::<ObjectRef, OngoingReconcile>::empty(),
+-                        reconcile_id_allocator: controller_and_external_state.controller.reconcile_id_allocator,
+-                    },
+-                    ..controller_and_external_state
+-                };
+-                (ClusterState {
+-                    controller_and_externals: s.controller_and_externals.insert(controller_id, controller_and_external_state_prime),
+-                    ..s
+-                }, ())
+-            },
+-        }
++        arbitrary() // TODO: fill in the spec body
+     }
+ 
+     pub open spec fn disable_crash(self) -> Action<ClusterState, int, ()> {
+         Action {
+             precondition: |input: int, s: ClusterState| {

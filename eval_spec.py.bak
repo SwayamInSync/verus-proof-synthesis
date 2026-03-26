@@ -1,0 +1,819 @@
+#!/usr/bin/env python3
+"""
+Two-stage evaluation for spec-writing benchmark tasks.
+
+Stage 1 – Patch & Verify:
+    Replace the erased body (`arbitrary() // TODO: fill in the spec body`)
+    with the model's generated spec body, then run Verus.
+    If Verus reports 0 errors → Stage 1 passes.
+
+Stage 2 – Equivalence Check:
+    Starting from the ground truth file (which already verifies),
+    inject the model's spec as a `__model` variant and add a proof lemma
+    that asserts extensional equality between GT and model spec.
+    If Verus can prove the equivalence lemma → Stage 2 passes.
+
+Usage:
+    # Evaluate a single task
+    python eval_spec.py --task-id AC_spec__...__allocate \\
+        --model-body "body.rs" \\
+        --benchmark-dir benchmarks/VeruSAGE-Bench-Spec-100
+
+    # Evaluate a batch (directory of model outputs)
+    python eval_spec.py --batch --model-dir results/qwen3/ \\
+        --benchmark-dir benchmarks/VeruSAGE-Bench-Spec-100
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+ERASED_MARKER = "arbitrary() // TODO: fill in the spec body"
+
+VERUS_DEFAULT = os.environ.get(
+    "VERUS_BIN",
+    "/home/t-swsingh/proof-model/ours/verified-code-gen/verus-binary/verus/verus",
+)
+
+SPEC_FN_RE = re.compile(
+    r'^(\s*)'                          # leading whitespace
+    r'(pub\s+)?'                       # optional pub
+    r'(open\s+)?'                      # optional open
+    r'spec\s*(?:\(checked\)\s*)?'      # spec or spec(checked)
+    r'fn\s+'                           # fn keyword
+    r'([A-Za-z_]\w*)',                 # function name
+    re.MULTILINE,
+)
+
+@dataclass
+class EvalResult:
+    task_id: str
+    stage1_pass: bool               # patched task verifies
+    stage1_detail: str              # e.g. "0 errors" or error snippet
+    stage2_pass: bool | None        # equivalence proved (None = skipped)
+    stage2_detail: str              # detail or "skipped"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def run_verus(code: str, verus_bin: str, timeout: int = 120) -> tuple[bool, str]:
+    """Write code to a temp file, run Verus, return (passed, output_snippet)."""
+    with tempfile.NamedTemporaryFile(
+        suffix=".rs", mode="w", delete=False
+    ) as f:
+        f.write(code)
+        tmp = f.name
+    try:
+        result = subprocess.run(
+            [verus_bin, tmp],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        output = result.stdout + result.stderr
+        passed = "0 errors" in output
+        # Extract last few meaningful lines
+        lines = [l.strip() for l in output.strip().split("\n") if l.strip()]
+        snippet = "\n".join(lines[-3:]) if lines else "(no output)"
+        return passed, snippet
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+    except OSError as e:
+        return False, f"os_error: {e}"
+    finally:
+        os.unlink(tmp)
+
+
+def find_matching_brace(lines: list[str], start_line: int) -> int | None:
+    """Find the line of the closing `}` matching the `{` on start_line.
+    
+    Returns the 0-indexed line number or None.
+    """
+    depth = 0
+    in_line_comment = False
+    in_block_comment = False
+    in_string = False
+    escape_next = False
+
+    for li in range(start_line, len(lines)):
+        line = lines[li]
+        ci_start = 0
+        if li == start_line:
+            # Start scanning from the `{`
+            idx = line.find("{")
+            if idx == -1:
+                continue
+            ci_start = idx
+        ci = ci_start
+        while ci < len(line):
+            ch = line[ci]
+            if escape_next:
+                escape_next = False
+                ci += 1
+                continue
+            if in_line_comment:
+                break
+            if in_block_comment:
+                if ch == "*" and ci + 1 < len(line) and line[ci + 1] == "/":
+                    in_block_comment = False
+                    ci += 2
+                    continue
+                ci += 1
+                continue
+            if in_string:
+                if ch == "\\":
+                    escape_next = True
+                elif ch == '"':
+                    in_string = False
+                ci += 1
+                continue
+            if ch == "/" and ci + 1 < len(line):
+                if line[ci + 1] == "/":
+                    break
+                if line[ci + 1] == "*":
+                    in_block_comment = True
+                    ci += 2
+                    continue
+            if ch == '"':
+                in_string = True
+                ci += 1
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return li
+            ci += 1
+        in_line_comment = False
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Stage 1: Patch & Verify
+# ---------------------------------------------------------------------------
+def patch_task(task_code: str, model_body: str) -> str | None:
+    """Replace the erased marker in the task with the model's spec body.
+    
+    Returns the patched code, or None if the marker isn't found.
+    """
+    if ERASED_MARKER not in task_code:
+        return None
+
+    # Detect indentation of the marker line
+    for line in task_code.split("\n"):
+        stripped = line.strip()
+        if ERASED_MARKER in stripped:
+            indent = " " * (len(line) - len(line.lstrip()))
+            break
+    else:
+        return None
+
+    # Indent the model body to match
+    body_lines = model_body.strip().split("\n")
+    indented_body = "\n".join(
+        (indent + bl if bl.strip() else bl) for bl in body_lines
+    )
+
+    return task_code.replace(
+        indent + ERASED_MARKER,
+        indented_body,
+        1,  # replace only the first occurrence
+    )
+
+
+def stage1_verify(
+    task_code: str,
+    model_body: str,
+    verus_bin: str,
+    timeout: int = 120,
+) -> tuple[bool, str, str]:
+    """Patch the model body into the task and run Verus.
+    
+    Returns (passed, detail, patched_code).
+    """
+    patched = patch_task(task_code, model_body)
+    if patched is None:
+        return False, "marker not found in task", ""
+    passed, detail = run_verus(patched, verus_bin, timeout)
+    return passed, detail, patched
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: Equivalence Harness
+# ---------------------------------------------------------------------------
+def _parse_fn_signature(lines: list[str], fn_line: int) -> dict | None:
+    """Parse the spec fn at fn_line to extract name, params, return type, etc.
+    
+    Returns dict with: name, params_str (e.g. "&self, x: int"),
+    param_names (e.g. "&self, x"), return_type, has_self, full_header.
+    """
+    # Collect the full signature (may span multiple lines up to `{`)
+    sig_parts = []
+    for li in range(fn_line, min(fn_line + 20, len(lines))):
+        sig_parts.append(lines[li])
+        if "{" in lines[li]:
+            break
+    full_sig = " ".join(l.strip() for l in sig_parts)
+
+    # Extract function name
+    m = SPEC_FN_RE.search(lines[fn_line])
+    if not m:
+        return None
+    name = m.group(4)
+
+    # Extract generic parameters (between fn name and `(`)
+    fn_keyword_idx = full_sig.find("fn " + name)
+    after_name_idx = fn_keyword_idx + len("fn " + name)
+    generics_str = ""
+    if after_name_idx < len(full_sig) and full_sig[after_name_idx] == "<":
+        # Find matching `>`
+        g_depth = 0
+        for gi in range(after_name_idx, len(full_sig)):
+            if full_sig[gi] == "<":
+                g_depth += 1
+            elif full_sig[gi] == ">":
+                g_depth -= 1
+                if g_depth == 0:
+                    generics_str = full_sig[after_name_idx : gi + 1]
+                    break
+
+    # Extract params between first balanced `()` after fn name
+    paren_start = full_sig.find("(", full_sig.find("fn " + name))
+    if paren_start == -1:
+        return None
+
+    depth = 0
+    paren_end = -1
+    for i in range(paren_start, len(full_sig)):
+        if full_sig[i] == "(":
+            depth += 1
+        elif full_sig[i] == ")":
+            depth -= 1
+            if depth == 0:
+                paren_end = i
+                break
+    if paren_end == -1:
+        return None
+
+    params_str = full_sig[paren_start + 1 : paren_end].strip()
+
+    # Extract param names (strip types for the call site)
+    param_names = []
+    has_self = False
+    for param in _split_params(params_str):
+        param = param.strip()
+        if not param:
+            continue
+        if param in ("self", "&self", "&mut self"):
+            has_self = True
+            param_names.append(param)
+        else:
+            # "x: Type" → "x",  "Ghost(x): Ghost<nat>" → "Ghost(x)"
+            colon_idx = _find_colon(param)
+            if colon_idx != -1:
+                param_names.append(param[:colon_idx].strip())
+            else:
+                param_names.append(param)
+
+    # Extract return type
+    ret_start = full_sig.find("->", paren_end)
+    if ret_start != -1:
+        ret_type = full_sig[ret_start + 2 :].strip()
+        # Remove trailing `{`
+        if ret_type.endswith("{"):
+            ret_type = ret_type[:-1].strip()
+        # Strip Verus clauses that come after the return type:
+        # recommends, requires, ensures, decreases, when
+        for clause in ("recommends", "requires", "ensures", "decreases", "when"):
+            idx = ret_type.find(clause)
+            if idx > 0:
+                ret_type = ret_type[:idx].strip().rstrip(",")
+        # Balance parens/angles
+        ret_type = _balance_type(ret_type)
+    else:
+        ret_type = "()"
+
+    return {
+        "name": name,
+        "params_str": params_str,
+        "param_names": param_names,
+        "return_type": ret_type,
+        "has_self": has_self,
+        "generics": generics_str,
+        "full_header": full_sig,
+    }
+
+
+def _split_params(params_str: str) -> list[str]:
+    """Split parameter string by commas respecting angle brackets and parens."""
+    parts = []
+    depth = 0
+    current = []
+    for ch in params_str:
+        if ch in ("(", "<"):
+            depth += 1
+        elif ch in (")", ">"):
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    if current:
+        parts.append("".join(current))
+    return parts
+
+
+def _find_colon(param: str) -> int:
+    """Find the `:` separating name from type, respecting parens."""
+    depth = 0
+    for i, ch in enumerate(param):
+        if ch in ("(", "<"):
+            depth += 1
+        elif ch in (")", ">"):
+            depth -= 1
+        elif ch == ":" and depth == 0:
+            return i
+    return -1
+
+
+def _balance_type(t: str) -> str:
+    """Trim a type string to the first balanced point (no trailing junk)."""
+    depth_paren = 0
+    depth_angle = 0
+    for i, ch in enumerate(t):
+        if ch == "(":
+            depth_paren += 1
+        elif ch == ")":
+            depth_paren -= 1
+        elif ch == "<":
+            depth_angle += 1
+        elif ch == ">":
+            depth_angle -= 1
+        # After the first token, if we're balanced and see whitespace/newline → stop
+        if i > 0 and depth_paren == 0 and depth_angle == 0 and ch == "\n":
+            return t[:i].strip()
+    return t.strip()
+
+
+def _find_target_fn(lines: list[str], fn_name: str) -> int | None:
+    """Find the line index of the target spec fn declaration."""
+    for i, line in enumerate(lines):
+        m = SPEC_FN_RE.match(line)
+        if m and m.group(4) == fn_name:
+            return i
+    return None
+
+
+def _find_enclosing_impl_end(lines: list[str], fn_line: int) -> int | None:
+    """For a method, find the closing `}` of its enclosing impl block.
+    
+    Strategy: walk backwards looking for `impl ... {` lines.  For each one
+    found, check whether its closing brace is *after* fn_line (meaning the
+    function is actually inside that impl).  The function must also be
+    indented more than the impl line.
+    """
+    fn_indent = len(lines[fn_line]) - len(lines[fn_line].lstrip())
+
+    for i in range(fn_line - 1, -1, -1):
+        stripped = lines[i].strip()
+        if not stripped.startswith("impl") or "{" not in lines[i]:
+            continue
+        # Found a candidate impl line
+        impl_indent = len(lines[i]) - len(lines[i].lstrip())
+        # The fn must be indented strictly more than the impl
+        if fn_indent <= impl_indent:
+            continue
+        # Find the impl's closing brace and ensure it's after fn_line
+        impl_end = find_matching_brace(lines, i)
+        if impl_end is not None and impl_end > fn_line:
+            return impl_end
+        # This impl closes before our fn — keep searching further back
+
+    return None
+
+
+def build_equivalence_harness(
+    gt_code: str,
+    model_body: str,
+    fn_name: str,
+    is_impl_member: bool,
+    return_type: str,
+) -> str | None:
+    """Build an equivalence harness from ground truth + model body.
+    
+    Strategy:
+      - Start from the ground truth file (already verifies)
+      - Add model's spec fn with name `{fn_name}__model`
+      - Add a proof lemma asserting equivalence
+      - Insert at the right place (inside impl for methods, or top-level)
+    
+    Returns the harness code, or None on failure.
+    """
+    lines = gt_code.split("\n")
+
+    # Find the target fn
+    fn_line = _find_target_fn(lines, fn_name)
+    if fn_line is None:
+        return None
+
+    # Auto-detect if inside an impl block (more reliable than metadata)
+    actually_in_impl = _find_enclosing_impl_end(lines, fn_line) is not None
+    if actually_in_impl and not is_impl_member:
+        is_impl_member = True  # override stale metadata
+
+    # Parse its signature (for param names, self detection, etc.)
+    sig = _parse_fn_signature(lines, fn_line)
+    if sig is None:
+        return None
+
+    # Find the opening `{` line
+    brace_line = None
+    for li in range(fn_line, min(fn_line + 30, len(lines))):
+        if "{" in lines[li]:
+            brace_line = li
+            break
+    if brace_line is None:
+        return None
+
+    # Find the closing `}` of the fn body
+    fn_end = find_matching_brace(lines, brace_line)
+    if fn_end is None:
+        return None
+
+    # Determine the indentation from the fn declaration line
+    indent = " " * (len(lines[fn_line]) - len(lines[fn_line].lstrip()))
+
+    # ---- Build the __model function ----
+    # Copy ALL header lines (fn_line through brace_line inclusive),
+    # renaming fn_name → fn_name__model in the declaration line.
+    model_header_lines = []
+    for li in range(fn_line, brace_line + 1):
+        line = lines[li]
+        if li == fn_line:
+            # Rename the function
+            line = re.sub(
+                rf'fn\s+{re.escape(fn_name)}\b',
+                f'fn {fn_name}__model',
+                line,
+                count=1,
+            )
+        model_header_lines.append(line)
+    model_header = "\n".join(model_header_lines)
+
+    # Indent the model body
+    body_indent = indent + "    "
+    model_body_stripped = model_body.strip().split("\n")
+    indented_model_body = "\n".join(
+        (body_indent + bl if bl.strip() else bl) for bl in model_body_stripped
+    )
+
+    # ---- Build the equivalence proof ----
+    # Equivalence operator: <==> for bool, =~= for everything else
+    if return_type.strip() == "bool":
+        equiv_op = "<==>"
+    else:
+        equiv_op = "=~="
+
+    # Build call expressions
+    non_self_params = [
+        p for p in sig["param_names"]
+        if p not in ("self", "&self", "&mut self")
+    ]
+    args_str = ", ".join(non_self_params)
+
+    if sig["has_self"]:
+        gt_call = f"self.{fn_name}({args_str})"
+        model_call = f"self.{fn_name}__model({args_str})"
+    elif is_impl_member:
+        # Static method inside impl: use Self:: prefix
+        gt_call = f"Self::{fn_name}({args_str})"
+        model_call = f"Self::{fn_name}__model({args_str})"
+    else:
+        gt_call = f"{fn_name}({args_str})"
+        model_call = f"{fn_name}__model({args_str})"
+
+    proof_params_str = sig["params_str"]
+    generics = sig.get("generics", "")
+
+    # Assemble the model fn + equivalence proof
+    model_fn_block = f"""\
+{model_header}
+{indented_model_body}
+{indent}}}
+
+{indent}proof fn {fn_name}__equiv{generics}({proof_params_str})
+{indent}    ensures
+{indent}        {gt_call} {equiv_op} {model_call},
+{indent}{{
+{indent}}}"""
+
+    # ---- Insert location ----
+    if is_impl_member:
+        impl_end = _find_enclosing_impl_end(lines, fn_line)
+        if impl_end is None:
+            insert_line = fn_end + 1
+        else:
+            insert_line = impl_end
+    else:
+        insert_line = fn_end + 1
+
+    new_lines = lines[:insert_line] + ["", model_fn_block, ""] + lines[insert_line:]
+
+    return "\n".join(new_lines)
+
+def dump_log(debug_dir, file, content):
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    dump = debug_dir / file
+    dump.write_text(content)
+
+def stage2_equivalence(
+    gt_code: str,
+    model_body: str,
+    fn_name: str,
+    is_impl_member: bool,
+    return_type: str,
+    verus_bin: str,
+    timeout: int = 120,
+    debug_dir: Path | None = None,
+    task_id: str = "",
+) -> tuple[bool, str]:
+    """Build an equivalence harness and run Verus.
+    
+    Returns (passed, detail).
+    """
+    harness = build_equivalence_harness(
+        gt_code, model_body, fn_name, is_impl_member, return_type,
+    )
+    if harness is None:
+        return False, "failed to build harness"
+
+    passed, detail = run_verus(harness, verus_bin, timeout)
+
+    # Dump harness on failure (or always if debug_dir set)
+    if debug_dir is not None and not passed:
+        dump_log(debug_dir, f"{task_id}_s2_harness.rs", harness)
+        dump_log(debug_dir, f"{task_id}_s2_harness_output.txt", detail)
+        print(f"    [debug] S2 harness dumped → {debug_dir / f'{task_id}_s2_harness.rs'}")
+
+    return passed, detail
+
+# ---------------------------------------------------------------------------
+# Single task evaluation
+# ---------------------------------------------------------------------------
+def evaluate_task(
+    task_id: str,
+    model_body: str,
+    benchmark_dir: Path,
+    metadata: dict,
+    verus_bin: str = VERUS_DEFAULT,
+    timeout: int = 120,
+    debug_dir: Path | None = None,
+) -> EvalResult:
+    """Evaluate a model's spec body for a single task.
+    
+    Returns EvalResult with both stage results.
+    """
+    task_path = benchmark_dir / "tasks" / f"{task_id}.rs"
+    gt_path = benchmark_dir / "ground-truth" / f"{task_id}.rs"
+
+    if not task_path.exists() or not gt_path.exists():
+        return EvalResult(task_id, False, "file not found", None, "skipped")
+
+    task_code = task_path.read_text()
+    gt_code = gt_path.read_text()
+
+    # Stage 1: Patch & Verify
+    s1_pass, s1_detail, patched = stage1_verify(task_code, model_body, verus_bin, timeout)
+
+    # Dump patched task on S1 failure
+    if not s1_pass and debug_dir is not None:
+        dump_log(debug_dir, f"{task_id}_s1_patched.rs", patched if patched else "(patch_task returned None)")
+        dump_log(debug_dir, f"{task_id}_s1_verus_output.txt", s1_detail)
+        print(f"    [debug] S1 patched dumped → {debug_dir / f'{task_id}_s1_patched.rs'}")
+
+    # Stage 2: Equivalence (only if stage 1 passes)
+    if not s1_pass:
+        return EvalResult(task_id, False, s1_detail, None, "skipped (stage1 failed)")
+
+    fn_name = metadata["target_fn"]
+    is_impl = metadata.get("is_impl_member", False)
+    ret_type = metadata.get("target_return_type", "bool")
+
+    s2_pass, s2_detail = stage2_equivalence(
+        gt_code, model_body, fn_name, is_impl, ret_type, verus_bin, timeout,
+        debug_dir=debug_dir, task_id=task_id,
+    )
+
+    return EvalResult(task_id, s1_pass, s1_detail, s2_pass, s2_detail)
+
+
+# ---------------------------------------------------------------------------
+# Batch evaluation
+# ---------------------------------------------------------------------------
+def load_metadata(benchmark_dir: Path) -> dict[str, dict]:
+    """Load tasks.jsonl into {task_id: record}."""
+    jsonl = benchmark_dir / "tasks.jsonl"
+    meta = {}
+    for line in open(jsonl):
+        rec = json.loads(line)
+        meta[rec["task_id"]] = rec
+    return meta
+
+
+def evaluate_batch(
+    model_dir: Path,
+    benchmark_dir: Path,
+    verus_bin: str = VERUS_DEFAULT,
+    timeout: int = 120,
+    debug_dir: Path | None = None,
+) -> list[EvalResult]:
+    """Evaluate all model outputs in model_dir.
+    
+    Expects model_dir to contain files named {task_id}.rs (or {task_id}.body)
+    with the model's spec body.
+    """
+    meta = load_metadata(benchmark_dir)
+    results = []
+
+    files = sorted(model_dir.glob("*.rs")) + sorted(model_dir.glob("*.body"))
+
+    for f in files:
+        task_id = f.stem
+        if task_id not in meta:
+            print(f"  SKIP {task_id}: not in benchmark metadata")
+            continue
+
+        model_body = f.read_text().strip()
+        result = evaluate_task(
+            task_id, model_body, benchmark_dir, meta[task_id],
+            verus_bin, timeout, debug_dir=debug_dir,
+        )
+        status = "S1=" + ("PASS" if result.stage1_pass else "FAIL")
+        if result.stage2_pass is not None:
+            status += " S2=" + ("PASS" if result.stage2_pass else "FAIL")
+        print(f"  {task_id} {status}")
+        results.append(result)
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--benchmark-dir",
+        type=Path,
+        default=Path("benchmarks/VeruSAGE-Bench-Spec-100"),
+        help="Path to the benchmark (with tasks/, ground-truth/, tasks.jsonl)",
+    )
+    parser.add_argument("--verus-bin", type=str, default=VERUS_DEFAULT)
+    parser.add_argument("--timeout", type=int, default=120, help="Verus timeout (s)")
+    parser.add_argument(
+        "--debug-dir", type=Path, default=None,
+        help="Directory to dump .rs files fed to Verus on failure (for debugging)",
+    )
+
+    sub = parser.add_subparsers(dest="command")
+
+    # --- Single task ---
+    single = sub.add_parser("single", help="Evaluate one task")
+    single.add_argument("--task-id", required=True, help="Task ID to evaluate")
+    single.add_argument(
+        "--model-body",
+        type=Path,
+        required=True,
+        help="File containing the model's spec body text",
+    )
+
+    # --- Batch ---
+    batch = sub.add_parser("batch", help="Evaluate a directory of model outputs")
+    batch.add_argument(
+        "--model-dir",
+        type=Path,
+        required=True,
+        help="Directory of {task_id}.rs files with model bodies",
+    )
+    batch.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output JSONL results file",
+    )
+
+    # --- Self-test (with ground truth bodies) ---
+    selftest = sub.add_parser("selftest", help="Self-test using ground truth bodies")
+    selftest.add_argument("--limit", type=int, default=5, help="Max tasks to test")
+
+    args = parser.parse_args()
+
+    if args.command == "single":
+        meta = load_metadata(args.benchmark_dir)
+        if args.task_id not in meta:
+            print(f"Error: {args.task_id} not in benchmark", file=sys.stderr)
+            sys.exit(1)
+        model_body = args.model_body.read_text().strip()
+        result = evaluate_task(
+            args.task_id, model_body, args.benchmark_dir, meta[args.task_id],
+            args.verus_bin, args.timeout, debug_dir=args.debug_dir,
+        )
+        print(f"Task:   {result.task_id}")
+        print(f"Stage1: {'PASS' if result.stage1_pass else 'FAIL'} — {result.stage1_detail}")
+        if result.stage2_pass is not None:
+            print(f"Stage2: {'PASS' if result.stage2_pass else 'FAIL'} — {result.stage2_detail}")
+        else:
+            print(f"Stage2: SKIPPED — {result.stage2_detail}")
+
+    elif args.command == "batch":
+        results = evaluate_batch(
+            args.model_dir, args.benchmark_dir, args.verus_bin, args.timeout,
+            debug_dir=args.debug_dir,
+        )
+        # Summary
+        s1_pass = sum(1 for r in results if r.stage1_pass)
+        s2_tested = [r for r in results if r.stage2_pass is not None]
+        s2_pass = sum(1 for r in s2_tested if r.stage2_pass)
+        print(f"\n{'='*60}")
+        print(f"Results: {len(results)} tasks evaluated")
+        print(f"  Stage 1 (verify):      {s1_pass}/{len(results)} pass")
+        print(f"  Stage 2 (equivalence): {s2_pass}/{len(s2_tested)} pass")
+
+        if args.output:
+            with open(args.output, "w") as f:
+                for r in results:
+                    f.write(json.dumps({
+                        "task_id": r.task_id,
+                        "stage1_pass": r.stage1_pass,
+                        "stage1_detail": r.stage1_detail,
+                        "stage2_pass": r.stage2_pass,
+                        "stage2_detail": r.stage2_detail,
+                    }) + "\n")
+            print(f"  Results written to {args.output}")
+
+    elif args.command == "selftest":
+        meta = load_metadata(args.benchmark_dir)
+        task_ids = list(meta.keys())[: args.limit]
+        print(f"Self-test: evaluating {len(task_ids)} tasks with ground truth bodies\n")
+
+        for tid in task_ids:
+            # Extract ground truth body
+            gt_path = args.benchmark_dir / "ground-truth" / f"{tid}.rs"
+            gt_code = gt_path.read_text()
+            gt_lines = gt_code.split("\n")
+
+            fn_name = meta[tid]["target_fn"]
+            fn_line = _find_target_fn(gt_lines, fn_name)
+            if fn_line is None:
+                print(f"  {tid[:60]:60s} SKIP (fn not found)")
+                continue
+
+            # Find body
+            brace_line = None
+            for li in range(fn_line, min(fn_line + 20, len(gt_lines))):
+                if "{" in gt_lines[li]:
+                    brace_line = li
+                    break
+            if brace_line is None:
+                print(f"  {tid[:60]:60s} SKIP (no brace)")
+                continue
+            fn_end = find_matching_brace(gt_lines, brace_line)
+            if fn_end is None:
+                print(f"  {tid[:60]:60s} SKIP (no closing brace)")
+                continue
+
+            # Extract body (lines between opening { and closing })
+            body_lines = gt_lines[brace_line + 1 : fn_end]
+            gt_body = "\n".join(body_lines)
+
+            result = evaluate_task(
+                tid, gt_body, args.benchmark_dir, meta[tid],
+                args.verus_bin, args.timeout, debug_dir=args.debug_dir,
+            )
+            s1 = "PASS" if result.stage1_pass else "FAIL"
+            s2 = "PASS" if result.stage2_pass else ("FAIL" if result.stage2_pass is not None else "SKIP")
+            print(f"  {tid[:60]:60s} S1={s1} S2={s2}")
+            if not result.stage1_pass:
+                print(f"    S1 detail: {result.stage1_detail[:100]}")
+            if result.stage2_pass is False:
+                print(f"    S2 detail: {result.stage2_detail[:100]}")
+
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()

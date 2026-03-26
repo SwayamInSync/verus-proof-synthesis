@@ -1,0 +1,20 @@
+--- ground-truth/VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip_helper__is_prefix_secure.rs
++++ tasks/VE_spec__regular__repetition__impl2__theorem_parse_serialize_roundtrip_helper__is_prefix_secure.rs
+@@ -49,16 +49,11 @@
+ 
+ // File: src/regular/repetition.rs
+ pub struct RepeatN<C>(pub C, pub usize);
+ 
+ impl<C: View> View for RepeatN<C> {
+-    type V = RepeatN<<C as View>::V>;
+-
+-    open spec fn view(&self) -> Self::V {
+-        RepeatN(self.0@, self.1)
+-    }
+-
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ 
+ impl<C: SecureSpecCombinator> RepeatN<C> {
+ 

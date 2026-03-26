@@ -1,0 +1,15 @@
+--- ground-truth/ST_spec__subregion_new3__get_subregion_view.rs
++++ tasks/ST_spec__subregion_new3__get_subregion_view.rs
+@@ -46,11 +46,11 @@
+     recommends
+         0 <= start,
+         0 <= len,
+         start + len <= region.len(),
+ {
+-    PersistentMemoryRegionView{ state: region.state.subrange(start as int, (start + len) as int) }
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ pub open spec fn views_differ_only_where_subregion_allows(
+     v1: PersistentMemoryRegionView,
+     v2: PersistentMemoryRegionView,

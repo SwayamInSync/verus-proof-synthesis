@@ -1,0 +1,46 @@
+--- ground-truth/IR_spec__host_impl_v__impl2__effect_of_delegation_map_set__cmp_spec.rs
++++ tasks/IR_spec__host_impl_v__impl2__effect_of_delegation_map_set__cmp_spec.rs
+@@ -127,42 +127,11 @@
+     spec fn cmp_spec(self, other: Self) -> Ordering;
+ }
+ 
+ 
+ impl<K: KeyTrait + VerusClone> KeyIterator<K> {
+-    pub open spec fn new_spec(k: K) -> Self {
+-        KeyIterator { k: Some(k) }
+-    }
+-
+-
+-    pub open spec fn cmp_spec(self, other: Self) -> Ordering {
+-        match (self.k, other.k) {
+-            (None, None) => Ordering::Equal,
+-            (None, Some(_)) => Ordering::Less,
+-            (Some(_), None) => Ordering::Greater,
+-            (Some(i), Some(j)) => { i.cmp_spec(j) }
+-        }
+-    }
+-
+-    pub open spec fn lt_spec(self, other: Self) -> bool {
+-        (!self.k.is_None() && other.k.is_None())
+-      || (!self.k.is_None() && !other.k.is_None() && self.k.get_Some_0().cmp_spec(other.k.get_Some_0()).lt())
+-    }
+-
+-    pub open spec fn is_end_spec(&self) -> bool {
+-        self.k.is_None()
+-    }
+-
+-    #[verifier::external_body]
+-    #[verifier(when_used_as_spec(is_end_spec))]
+-    pub fn is_end(&self) -> (b: bool)
+-        ensures b == self.is_end_spec()
+-    {
+-        unimplemented!()
+-    }
+-
+-
++    arbitrary() // TODO: fill in the spec body
+ }
+ 
+ pub struct KeyRange<K: KeyTrait + VerusClone> {
+     pub lo: KeyIterator<K>,
+     pub hi: KeyIterator<K>,
