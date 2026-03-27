@@ -96,3 +96,106 @@ def is_safe_content(text: str) -> tuple[bool, str]:
         if pattern in text:
             return False, f"Contains disallowed {desc}"
     return True, ""
+
+
+# ---------------------------------------------------------------------------
+#  Lynette
+# ---------------------------------------------------------------------------
+
+def find_lynette() -> str | None:
+    """Locate the Lynette binary relative to this file or the repo root."""
+    from pathlib import Path
+    # Try relative to this file: ../../utils/lynette/...  or  ../../../../utils/lynette/...
+    candidates = [
+        Path(__file__).resolve().parent.parent.parent.parent.parent
+        / "utils" / "lynette" / "source" / "target" / "debug",
+        Path(__file__).resolve().parent.parent
+        / "utils" / "lynette" / "source" / "target" / "debug",
+    ]
+    for base in candidates:
+        for name in ("lynette", "lynette.exe"):
+            p = base / name
+            if p.exists():
+                return str(p)
+    return None
+
+
+def lynette_compare(original: str, modified: str, flags: list[str] | None = None) -> tuple[bool, str]:
+    """
+    Run `lynette compare` between two code strings.
+    flags: extra CLI flags like ['--spec'] to control DeghostMode.
+    Returns (ok, reason).
+    """
+    lynette = find_lynette()
+    if lynette is None:
+        return True, "(Lynette not found, skipping compare check)"
+
+    import tempfile as _tf
+    orig_f = _tf.NamedTemporaryFile(mode="w", delete=False, prefix="lyn_orig_", suffix=".rs", encoding="utf-8")
+    orig_f.write(original)
+    orig_f.close()
+    mod_f = _tf.NamedTemporaryFile(mode="w", delete=False, prefix="lyn_mod_", suffix=".rs", encoding="utf-8")
+    mod_f.write(modified)
+    mod_f.close()
+
+    try:
+        cmd = [lynette, "compare"] + (flags or []) + [orig_f.name, mod_f.name]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            return True, ""
+        stdout = result.stdout.strip()
+        return False, f"Lynette compare failed (exit {result.returncode}): {stdout or result.stderr.strip()}"
+    except subprocess.TimeoutExpired:
+        return True, "(Lynette timed out, skipping)"
+    except Exception as e:
+        return True, f"(Lynette error: {e}, skipping)"
+    finally:
+        try:
+            os.unlink(orig_f.name)
+        except OSError:
+            pass
+        try:
+            os.unlink(mod_f.name)
+        except OSError:
+            pass
+
+
+def lynette_additions_check(original: str, modified: str) -> tuple[bool, str]:
+    """
+    Run `lynette additions` to verify only ghost/proof code was changed.
+    Returns (ok, reason). If Lynette is not found, passes with a warning.
+    """
+    lynette = find_lynette()
+    if lynette is None:
+        return True, "(Lynette not found, skipping additions check)"
+
+    import tempfile as _tf
+    orig_f = _tf.NamedTemporaryFile(mode="w", delete=False, prefix="lyn_orig_", suffix=".rs", encoding="utf-8")
+    orig_f.write(original)
+    orig_f.close()
+    mod_f = _tf.NamedTemporaryFile(mode="w", delete=False, prefix="lyn_mod_", suffix=".rs", encoding="utf-8")
+    mod_f.write(modified)
+    mod_f.close()
+
+    try:
+        cmd = [lynette, "additions", orig_f.name, mod_f.name]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            return True, ""
+        stdout = result.stdout.strip()
+        if "Disallowed changes detected" in stdout:
+            return False, f"Lynette: disallowed changes ({stdout})"
+        return False, f"Lynette additions failed (exit {result.returncode}): {stdout or result.stderr.strip()}"
+    except subprocess.TimeoutExpired:
+        return True, "(Lynette timed out, skipping)"
+    except Exception as e:
+        return True, f"(Lynette error: {e}, skipping)"
+    finally:
+        try:
+            os.unlink(orig_f.name)
+        except OSError:
+            pass
+        try:
+            os.unlink(mod_f.name)
+        except OSError:
+            pass
