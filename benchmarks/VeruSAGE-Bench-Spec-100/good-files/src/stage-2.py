@@ -11,20 +11,17 @@ from utility import load_config, make_client, call_llm, run_verus, is_safe_conte
 #  Logging
 # ---------------------------------------------------------------------------
 
-_logs_dir: Path | None = None
-
 
 def init_logging(output_dir: Path, task_name: str) -> Path:
     """Create and return a per-task log directory: <output_dir>/logs/<task_name>/"""
-    global _logs_dir
     d = output_dir / "logs" / task_name
     d.mkdir(parents=True, exist_ok=True)
-    _logs_dir = d
     return d
 
 
 def _log_attempt(
     attempt: int,
+    log_dir: Path | None,
     *,
     messages: list[dict] | None = None,
     llm_response: str | None = None,
@@ -52,9 +49,9 @@ def _log_attempt(
       6. Verus Result   — verified / errors
       7. Status Summary — final outcome of this attempt
     """
-    if _logs_dir is None:
+    if log_dir is None:
         return
-    path = _logs_dir / f"attempt-{attempt}.md"
+    path = log_dir / f"attempt-{attempt}.md"
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(f"# Attempt {attempt}\n\n")
@@ -298,10 +295,11 @@ def format_attempt_history(history: list[AttemptRecord], max_attempts: int = 8) 
 def run_equivalence_repair_loop(
     patched_harness: str,
     verus_path: str,
-    client: openai.OpenAI,
+    client,
     cfg: dict,
     last_errors: str,
     max_repairs: int = 5,
+    log_dir: Path | None = None,
 ) -> bool:
     """
     Run up to max_repairs LLM iterations to fill in HELPER_LEMMA and PROOF_BODY
@@ -353,7 +351,7 @@ def run_equivalence_repair_loop(
                 response="(LLM call failed)", error_text=str(e),
             ))
             _log_attempt(
-                attempt, messages=messages, llm_response=None,
+                attempt, log_dir, messages=messages, llm_response=None,
                 status="LLM_ERROR",
                 verus_errors=str(e),
             )
@@ -370,7 +368,7 @@ def run_equivalence_repair_loop(
                 response=content, error_text=fail_msg,
             ))
             _log_attempt(
-                attempt, messages=messages, llm_response=content,
+                attempt, log_dir, messages=messages, llm_response=content,
                 status="REJECTED_EDITS — " + fail_msg,
                 tokens_in=p_tok, tokens_out=c_tok,
             )
@@ -390,7 +388,7 @@ def run_equivalence_repair_loop(
                 response=content, error_text=f"Unsafe change rejected: {reason}",
             ))
             _log_attempt(
-                attempt, messages=messages, llm_response=content,
+                attempt, log_dir, messages=messages, llm_response=content,
                 parsed_helper_lemmas=helper_lemmas, parsed_proof_body=proof_body,
                 safety_ok=False, safety_reason=reason,
                 status="REJECTED_UNSAFE — " + reason,
@@ -408,7 +406,7 @@ def run_equivalence_repair_loop(
             elapsed = time.time() - start
             print(f"  Attempt {attempt} — VERIFIED ({elapsed:.1f}s, {total_in+total_out} tokens)", flush=True)
             _log_attempt(
-                attempt, messages=messages, llm_response=content,
+                attempt, log_dir, messages=messages, llm_response=content,
                 parsed_helper_lemmas=helper_lemmas, parsed_proof_body=proof_body,
                 safety_ok=True, patched_code=candidate,
                 verus_verified=True, verus_exit_code=exit_code,
@@ -424,7 +422,7 @@ def run_equivalence_repair_loop(
             response=content, error_text=error_text,
         ))
         _log_attempt(
-            attempt, messages=messages, llm_response=content,
+            attempt, log_dir, messages=messages, llm_response=content,
             parsed_helper_lemmas=helper_lemmas, parsed_proof_body=proof_body,
             safety_ok=True, patched_code=candidate,
             verus_verified=False, verus_errors=error_text, verus_exit_code=exit_code,
@@ -465,7 +463,7 @@ def main(args):
 
     # Log the initial verification as attempt 0
     _log_attempt(
-        0, patched_code=patched_content,
+        0, log_dir, patched_code=patched_content,
         verus_verified=verified, verus_errors=error_text, verus_exit_code=exit_code,
         status="VERIFIED (initial)" if verified else "FAILED (initial)",
     )
@@ -483,6 +481,7 @@ def main(args):
         cfg=cfg,
         last_errors=error_text,
         max_repairs=max_repairs,
+        log_dir=log_dir,
     )
 
     if success:
