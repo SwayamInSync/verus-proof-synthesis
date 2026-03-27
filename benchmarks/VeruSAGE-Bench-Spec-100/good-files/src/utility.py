@@ -123,8 +123,10 @@ def find_lynette() -> str | None:
 def lynette_compare(original: str, modified: str, flags: list[str] | None = None) -> tuple[bool, str]:
     """
     Run `lynette compare` between two code strings.
-    flags: extra CLI flags like ['--spec'] to control DeghostMode.
-    Returns (ok, reason).
+    By default (no flags), strips ALL ghost/spec code and compares only exec code.
+    Pass flags like ['--spec'] to also compare spec function bodies,
+    ['--requires', '--ensures'] to compare those clauses, etc.
+    Returns (ok, reason).  ok=True means the files are the same after deghosting.
     """
     lynette = find_lynette()
     if lynette is None:
@@ -162,8 +164,16 @@ def lynette_compare(original: str, modified: str, flags: list[str] | None = None
 
 def lynette_additions_check(original: str, modified: str) -> tuple[bool, str]:
     """
-    Run `lynette additions` to verify only ghost/proof code was changed.
+    Run `lynette additions` to verify only allowed ghost/proof code was changed.
     Returns (ok, reason). If Lynette is not found, passes with a warning.
+
+    NOTE: This is designed for the VeruSAGE proof-filling pipeline where target
+    functions use `unimplemented!()` placeholders.  It does NOT support the
+    spec-body-filling use case (stage-1) because:
+      - `additions` only treats proof/exec fns as targets, not spec fns.
+      - It recognizes `unimplemented!()` as the placeholder, not `arbitrary()`.
+    For spec-body safety, use `lynette_compare` without flags instead (checks
+    that exec code is unchanged) plus string-level safety checks.
     """
     lynette = find_lynette()
     if lynette is None:

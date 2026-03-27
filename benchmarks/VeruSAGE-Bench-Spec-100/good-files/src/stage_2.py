@@ -199,7 +199,11 @@ class AttemptRecord:
 def _patch_between_markers(content: str, start_tag: str, end_tag: str, replacement: str) -> str:
     """Replace everything between start_tag and end_tag markers with replacement."""
     pattern = rf"(//%%\s*{re.escape(start_tag)}\n).*?(//%%\s*{re.escape(end_tag)})"
-    patched = re.sub(pattern, r"\1" + replacement.rstrip("\n") + "\n" + r"\2", content, flags=re.DOTALL)
+    # Use a lambda to avoid re.sub interpreting backslashes in replacement
+    # as backreferences (e.g. \1 would silently corrupt the output).
+    def _repl(m: re.Match) -> str:
+        return m.group(1) + replacement.rstrip("\n") + "\n" + m.group(2)
+    patched = re.sub(pattern, _repl, content, flags=re.DOTALL)
     return patched
 
 

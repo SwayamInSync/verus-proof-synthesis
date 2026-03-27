@@ -4,7 +4,7 @@ Stage 1: LLM-based spec body generation for Verus verification tasks.
 Workflow:
   1. Read a task file (spec body replaced with `arbitrary() // TODO: fill in the spec body`)
   2. Prompt the LLM to provide the spec body
-  3. Safety-check the response (string-level + Lynette compare --spec)
+  3. Safety-check the response (string-level + Lynette compare)
   4. Patch the spec body into the task file
   5. Run Verus to verify
   6. If verified → return the model spec for stage 2
@@ -197,7 +197,9 @@ def patch_spec_body(task_code: str, spec_body: str) -> str | None:
     """Replace the `arbitrary() // TODO: ...` marker with the spec body."""
     if not TODO_PATTERN.search(task_code):
         return None
-    return TODO_PATTERN.sub(spec_body, task_code, count=1)
+    # Use a lambda to avoid re.sub interpreting backslashes in spec_body
+    # as backreferences (e.g. \1 would silently corrupt the output).
+    return TODO_PATTERN.sub(lambda _m: spec_body, task_code, count=1)
 
 
 # ---------------------------------------------------------------------------
@@ -208,15 +210,22 @@ def is_safe_spec_change(original_code: str, patched_code: str, spec_body: str) -
     """
     Two-layer safety check for spec body changes:
       1. String-level: no disallowed constructs in the spec body
-      2. Lynette compare --spec: ensure only spec function bodies differ
+      2. Lynette compare (no flags): strips all ghost/spec code and compares
+         only exec code, ensuring the model didn't tamper with executable code.
+
+    NOTE: We intentionally do NOT pass --spec to lynette compare, because the
+    spec body IS expected to change (that's the whole point of stage 1).
+    We also do NOT use `lynette additions` here because it only supports the
+    proof-filling pipeline (unimplemented!() placeholders), not spec-body filling.
     """
     # Layer 1: string-level
     safe, reason = is_safe_content(spec_body)
     if not safe:
         return False, reason
 
-    # Layer 2: Lynette compare (without --spec flag = compare executable code only)
-    # This ensures the model didn't sneak in executable code changes
+    # Layer 2: Lynette compare (no flags = compare exec code only)
+    # Strips all ghost/spec code; if only the spec body changed, this passes.
+    # If the model also changed exec code, this catches it.
     ok, msg = lynette_compare(original_code, patched_code)
     if not ok:
         return False, msg
