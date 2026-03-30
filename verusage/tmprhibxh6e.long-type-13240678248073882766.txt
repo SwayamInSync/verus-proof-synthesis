@@ -1,2 +1,0 @@
-vstd::map::Map<usize, vstd::simple_pptr::PointsTo<Container>>: std::marker::Copy
-vstd::prelude::Tracked<vstd::map::Map<usize, vstd::simple_pptr::PointsTo<Container>>>

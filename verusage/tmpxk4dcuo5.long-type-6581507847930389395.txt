@@ -1,1 +1,0 @@
-vstd::prelude::FnSpec<(ClusterState,), bool>: std::marker::Copy

@@ -4,64 +4,97 @@ fn main() {}
 
 verus!{
 
-// File: spec/utils.rs
-pub open spec fn map_new_rec<V>(dom: nat, val: V) -> Map<nat, V>
-    decreases dom,
-    when dom >= 0
+// File: defs.rs
+pub struct Execution<T> {
+    pub nat_to_state: spec_fn(nat) -> T,
+}
+
+impl<T> Execution<T> {
+
+    pub open spec fn suffix(self, pos: nat) -> Self {
+        Execution {
+            nat_to_state: |i: nat| (self.nat_to_state)(i + pos),
+        }
+    }
+
+}
+
+
+#[verifier(reject_recursive_types(T))]
+pub struct TempPred<T> {
+    pub pred: spec_fn(Execution<T>) -> bool,
+}
+
+impl<T> TempPred<T> {
+
+    pub open spec fn new(pred: spec_fn(Execution<T>) -> bool) -> Self {
+        TempPred {
+            pred: pred,
+        }
+    }
+
+    pub open spec fn satisfied_by(self, execution: Execution<T>) -> bool {
+        (self.pred)(execution)
+    }
+
+    pub open spec fn implies(self, other: Self) -> Self {
+        TempPred::new(|ex: Execution<T>| self.satisfied_by(ex) ==> other.satisfied_by(ex))
+    }
+
+}
+
+
+pub open spec fn always<T>(temp_pred: TempPred<T>) -> TempPred<T> {
+    TempPred::new(|ex: Execution<T>| forall |i: nat| #[trigger] temp_pred.satisfied_by(ex.suffix(i)))
+}
+
+pub open spec fn stable<T>(temp_pred: TempPred<T>) -> TempPred<T> {
+    TempPred::new(|ex: Execution<T>| temp_pred.implies(always(temp_pred)).satisfied_by(ex))
+}
+
+
+pub open spec fn stable_model<T>(temp_pred: TempPred<T>) -> TempPred<T> {
+    //%% MODEL_SPEC_START
+    // arbitrary() // TODO: model's written spec
+    //%% MODEL_SPEC_END
+    TempPred::new(|ex: Execution<T>| forall |i: nat| temp_pred.satisfied_by(ex.suffix(i)) ==> always(temp_pred).satisfied_by(ex.suffix(i)))
+}
+
+pub open spec fn valid<T>(temp_pred: TempPred<T>) -> bool {
+    forall |ex: Execution<T>| temp_pred.satisfied_by(ex)
+}
+
+
+// File: rules.rs
+	#[verifier::external_body]
+proof fn always_propagate_forwards<T>(ex: Execution<T>, p: TempPred<T>, i: nat)
+    requires always(p).satisfied_by(ex),
+    ensures always(p).satisfied_by(ex.suffix(i)),
+	{
+		unimplemented!()
+	}
+
+pub proof fn always_p_is_stable<T>(p: TempPred<T>)
+    ensures valid(stable(always(p))),
 {
-    if dom == 0 {
-        map![ dom => val]
-    } else {
-        map_new_rec((dom - 1) as nat, val).insert(dom, val)
+    assert forall |ex| #[trigger] always(p).satisfied_by(ex) implies always(always(p)).satisfied_by(ex) by {
+        assert forall |i| #[trigger] always(p).satisfied_by(ex.suffix(i)) by {
+            always_propagate_forwards::<T>(ex, p, i);
+        }
     }
 }
 
-pub open spec fn map_new_rec_model<V>(dom: nat, val: V) -> Map<nat, V>
-    decreases dom,
-    when dom >= 0
-{
-    if dom == 0 {
-        map![ dom => val]
-    } else {
-        map_new_rec_model((dom - 1) as nat, val).insert(dom, val)
-    }
-}
+//%% HELPER_LEMMA_START
+// write any helper lemmas here
+//%% HELPER_LEMMA_END
 
-proof fn map_new_rec_equiv<V>(dom: nat, val: V)
+proof fn equivalence_lemma<T>(temp_pred: TempPred<T>)
     ensures
-        map_new_rec(dom, val) =~= map_new_rec_model(dom, val),
-    decreases dom,
+        stable(temp_pred) =~= stable_model(temp_pred),
 {
-  if dom == 0 {
-    } else {
-        map_new_rec_equiv((dom - 1) as nat, val)
-    }
-}
-
-
-
-pub proof fn map_new_rec_dom_finite<V>(dom: nat, val: V)
-    ensures
-        map_new_rec(dom, val).dom().finite(),
-        forall|n: nat| 0 <= n <= dom <==> map_new_rec(dom, val).contains_key(n),
-        forall|n|
-            (#[trigger] map_new_rec(dom, val).contains_key(n)) ==> map_new_rec(dom, val)[n] == val,
-    decreases dom,
-{
-    if dom == 0 {
-    } else {
-        let sub_dom = (dom - 1) as nat;
-        let sub_map = map_new_rec(sub_dom as nat, val);
-        assert(sub_map.dom().finite()) by {
-            map_new_rec_dom_finite(sub_dom, val);
-        }
-        assert(forall|n: nat| (#[trigger] sub_map.contains_key(n)) <==> 0 <= n <= sub_dom) by {
-            map_new_rec_dom_finite(sub_dom, val);
-        }
-        assert(forall|n: nat| (#[trigger] sub_map.contains_key(n)) ==> sub_map[n] == val) by {
-            map_new_rec_dom_finite(sub_dom, val);
-        }
-    }
+    //%% PROOF_BODY_START
+    // write proof completion here
+    //%% PROOF_BODY_END
 }
 
 

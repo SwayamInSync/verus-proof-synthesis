@@ -28,7 +28,7 @@ from utility import (
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """\
-You are a Verus verification expert. Your task is to fill in the body of a \
+You are a Rust based Verus verification expert. Your task is to fill in the body of a \
 spec function so that the code verifies successfully with Verus.
 
 Rules:

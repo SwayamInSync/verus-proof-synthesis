@@ -21,7 +21,7 @@ if [[ -n "${CONTINUE_FROM}" ]]; then
     EXTRA_ARGS="--continue-from ${CONTINUE_FROM}"
     MODE="continue"
 else
-    BASE_DIR="/home/t-swsingh/proof-model/ours/verified-code-gen/evals/VeruSageBench/plain-harness-qwen3-30B-A3B-thinking-full"
+    BASE_DIR="/home/t-swsingh/proof-model/ours/verified-code-gen/evals/VeruSageBench/plain-harness-qwen3-30B-A3B-instruct-full"
     OUTPUT_DIR="${BASE_DIR}-${TIMESTAMP}"
     LOG_FILE="${OUTPUT_DIR}/benchmark-${TIMESTAMP}.log"
     mkdir -p "${OUTPUT_DIR}"

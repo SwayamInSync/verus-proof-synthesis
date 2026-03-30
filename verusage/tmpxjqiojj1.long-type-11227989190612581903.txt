@@ -1,1 +1,0 @@
-vstd::map::Map<usize, vstd::simple_pptr::PointsTo<Container>>: vstd::prelude::Integer
