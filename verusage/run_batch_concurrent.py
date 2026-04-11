@@ -229,7 +229,7 @@ def run_single_task(rs_file, config_file, output_dir, repair_steps, verus_args, 
 
 
 def run_batch(input_dir, config_file, output_dir=None, verus_args="", continue_from=None,
-              repair_steps=None, num_workers=1):
+              repair_steps=None, num_workers=1, skip_projects=None):
     """
     Run repair on all .rs files in the input directory.
 
@@ -320,6 +320,14 @@ def run_batch(input_dir, config_file, output_dir=None, verus_args="", continue_f
 
     # Get all .rs files
     all_rs_files = sorted(input_dir_path.glob("*.rs"))
+
+    # Filter out files from skipped projects (matched by prefix before first '__')
+    if skip_projects:
+        skip_prefixes = tuple(p + "__" for p in skip_projects)
+        skipped = [f for f in all_rs_files if f.name.startswith(skip_prefixes)]
+        all_rs_files = [f for f in all_rs_files if not f.name.startswith(skip_prefixes)]
+        if skipped:
+            print(f"Skipping {len(skipped)} files from projects: {', '.join(skip_projects)}")
 
     # Filter out processed files
     rs_files = [f for f in all_rs_files if f.name not in processed_files]
@@ -577,8 +585,12 @@ if __name__ == "__main__":
         "--workers", type=int, default=1,
         help="Number of parallel workers (default: 1 = sequential). "
              "Higher values send concurrent requests to vLLM for better throughput."
+    )    
+    parser.add_argument(
+        '--skip-projects', type=str, default=None, metavar='PREFIX',
+        help='Skip task files from these projects (comma-separated prefixes, e.g. "AC,AL,NR"). '
+             "Use when a model was trained on those repos and they should be excluded."
     )
-
     args = parser.parse_args()
 
     if not os.path.exists(args.input_dir):
@@ -595,5 +607,6 @@ if __name__ == "__main__":
 
     run_batch(
         args.input_dir, args.config_file, args.output_dir, args.verus_args, args.continue_from,
-        args.repair, args.workers
+        args.repair, args.workers,
+        [p.strip() for p in args.skip_projects.split(',')] if args.skip_projects else None
     )

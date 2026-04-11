@@ -5,6 +5,7 @@ TASKS_DIR="../benchmarks/VeruSAGE-Bench/tasks"
 CONFIG="vllm_config.json"
 REPAIR_STEPS=5
 WORKERS=${WORKERS:-3}
+SKIP_PROJECTS=${SKIP_PROJECTS:-""}
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 # Usage: ./run_bechmark.sh                          # fresh run
@@ -22,7 +23,7 @@ if [[ -n "${CONTINUE_FROM}" ]]; then
     EXTRA_ARGS="--continue-from ${CONTINUE_FROM}"
     MODE="continue"
 else
-    BASE_DIR="/home/t-swsingh/proof-model/ours/verified-code-gen/evals/VeruSageBench/results-qwen3-30B-A3B-instruct-full"
+    BASE_DIR="/home/t-swsingh/proof-model/ours/verified-code-gen/evals/VeruSageBench/results-qwen-verusyn-full"
     OUTPUT_DIR="${BASE_DIR}-${TIMESTAMP}"
     LOG_FILE="${OUTPUT_DIR}/benchmark-${TIMESTAMP}.log"
     mkdir -p "${OUTPUT_DIR}"
@@ -38,7 +39,12 @@ echo "Output dir: ${OUTPUT_DIR}" | tee -a "${LOG_FILE}"
 echo "Log file: ${LOG_FILE}" | tee -a "${LOG_FILE}"
 echo "Repairs: ${REPAIR_STEPS}" | tee -a "${LOG_FILE}"
 echo "Workers: ${WORKERS}" | tee -a "${LOG_FILE}"
+echo "Skip projects: ${SKIP_PROJECTS:-none}" | tee -a "${LOG_FILE}"
 echo "===========================================" | tee -a "${LOG_FILE}"
+
+if [[ -n "${SKIP_PROJECTS}" ]]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --skip-projects ${SKIP_PROJECTS}"
+fi
 
 # shellcheck disable=SC2086
 PYTHONUNBUFFERED=1 python3 run_batch_concurrent.py \

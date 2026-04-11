@@ -740,12 +740,21 @@ def run_batch(
     max_repairs: int,
     num_workers: int,
     continue_from: Path | None,
+    skip_projects: list[str] | None = None,
 ):
     global _output_code_dir
     all_files = sorted(tasks_dir.glob("*.rs"))
     if not all_files:
         print(f"No .rs files in {tasks_dir}")
         return
+
+    # Filter out files from skipped projects (matched by prefix before first '__')
+    if skip_projects:
+        skip_prefixes = tuple(p + "__" for p in skip_projects)
+        skipped = [f for f in all_files if f.name.startswith(skip_prefixes)]
+        all_files = [f for f in all_files if not f.name.startswith(skip_prefixes)]
+        if skipped:
+            print(f"Skipping {len(skipped)} files from projects: {', '.join(skip_projects)}")
 
     done_files: set[str] = set()
     results: list[dict] = []
@@ -905,6 +914,11 @@ def main():
     p.add_argument("--repairs", type=int, default=5, help="Max repair attempts per task")
     p.add_argument("--workers", type=int, default=1, help="Parallel workers")
     p.add_argument("--continue-from", default=None, help="Resume from this output dir")
+    p.add_argument(
+        "--skip-projects", type=str, default=None, metavar="PREFIX",
+        help='Skip task files from these projects (comma-separated prefixes, e.g. "AC,AL,NR"). '
+             "Use when a model was trained on those repos and they should be excluded."
+    )
     args = p.parse_args()
 
     cfg = load_config(args.config)
@@ -929,6 +943,7 @@ def main():
         max_repairs=args.repairs,
         num_workers=args.workers,
         continue_from=Path(args.continue_from) if args.continue_from else None,
+        skip_projects=[p.strip() for p in args.skip_projects.split(',')] if args.skip_projects else None,
     )
 
 
