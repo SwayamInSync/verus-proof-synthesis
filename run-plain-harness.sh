@@ -7,6 +7,7 @@ CONFIG="${REPO_DIR}/verusage/vllm_config.json"
 HARNESS="${REPO_DIR}/plain-harness.py"
 REPAIR_STEPS=5
 WORKERS=${WORKERS:-3}
+SKIP_PROJECTS=${SKIP_PROJECTS:-""}
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
 CONTINUE_FROM="${1:-}"
@@ -37,7 +38,12 @@ echo "Output dir: ${OUTPUT_DIR}" | tee -a "${LOG_FILE}"
 echo "Log file: ${LOG_FILE}" | tee -a "${LOG_FILE}"
 echo "Repairs: ${REPAIR_STEPS}" | tee -a "${LOG_FILE}"
 echo "Workers: ${WORKERS}" | tee -a "${LOG_FILE}"
+echo "Skip projects: ${SKIP_PROJECTS:-none}" | tee -a "${LOG_FILE}"
 echo "================================================" | tee -a "${LOG_FILE}"
+
+if [[ -n "${SKIP_PROJECTS}" ]]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --skip-projects ${SKIP_PROJECTS}"
+fi
 
 # shellcheck disable=SC2086
 PYTHONUNBUFFERED=1 python3 "${HARNESS}" \
