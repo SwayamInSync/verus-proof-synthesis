@@ -228,22 +228,70 @@ def is_safe_change(original: str, modified: str) -> tuple[bool, str]:
 
 
 _LYNETTE_BIN: Path | None = None
+_LYNETTE_BUILD_LOCK = threading.Lock()
+
+
+def _lynette_paths() -> tuple[Path, Path]:
+    """Return (expected_binary, cargo_manifest) under <script_dir>/utils/lynette/source."""
+    src = Path(__file__).parent / "utils" / "lynette" / "source"
+    bin_name = "lynette.exe" if sys.platform == "win32" else "lynette"
+    return src / "target" / "debug" / bin_name, src / "Cargo.toml"
+
+
+def _build_lynette() -> Path | None:
+    """Build Lynette in-tree via `cargo build` (debug profile, same as verusage).
+
+    Returns the resulting binary path on success, or None on failure.
+    Thread-safe: only one build runs at a time across workers.
+    """
+    expected, manifest = _lynette_paths()
+    with _LYNETTE_BUILD_LOCK:
+        if expected.exists():
+            return expected
+        if not manifest.exists():
+            print(f"WARN: Lynette source not found at {manifest}; AST check disabled.",
+                  flush=True)
+            return None
+        print(f"Building Lynette via cargo (this happens once): {manifest}", flush=True)
+        try:
+            result = subprocess.run(
+                ["cargo", "build", "--manifest-path", str(manifest)],
+                capture_output=True, text=True, timeout=600,
+            )
+        except FileNotFoundError:
+            print("WARN: `cargo` not on PATH; cannot build Lynette. AST check disabled.",
+                  flush=True)
+            return None
+        except subprocess.TimeoutExpired:
+            print("WARN: cargo build timed out after 600s; AST check disabled.", flush=True)
+            return None
+        if result.returncode != 0 or not expected.exists():
+            print(f"WARN: cargo build failed (exit {result.returncode}); AST check disabled.\n"
+                  f"  stderr: {result.stderr.strip()[:500]}", flush=True)
+            return None
+        print(f"Lynette built: {expected}", flush=True)
+        return expected
 
 
 def _find_lynette() -> Path | None:
-    """Locate the Lynette binary relative to this script."""
+    """Locate the Lynette binary at <script_dir>/utils/lynette/source/target/debug/lynette.
+
+    If missing, builds it via `cargo build` (matches verusage's behavior, which
+    invokes `cargo run` on first use). Result is cached for subsequent calls.
+    """
     global _LYNETTE_BIN
     if _LYNETTE_BIN is not None:
         return _LYNETTE_BIN
 
-    # Same resolution as verusage/utils.py: <repo>/utils/lynette/source/target/debug/lynette[.exe]
-    base = Path(__file__).parent / "utils" / "lynette" / "source" / "target" / "debug"
-    for name in ("lynette.exe", "lynette"):
-        candidate = base / name
-        if candidate.exists():
-            _LYNETTE_BIN = candidate
-            return _LYNETTE_BIN
-    return None
+    expected, _ = _lynette_paths()
+    if expected.exists():
+        _LYNETTE_BIN = expected
+        return _LYNETTE_BIN
+
+    built = _build_lynette()
+    if built is not None:
+        _LYNETTE_BIN = built
+    return _LYNETTE_BIN
 
 
 def _lynette_additions_check(original: str, modified: str) -> tuple[bool, str]:
@@ -920,6 +968,17 @@ def main():
              "Use when a model was trained on those repos and they should be excluded."
     )
     args = p.parse_args()
+
+    # Resolve / build Lynette up-front so a missing toolchain fails fast
+    # (and so the cargo build doesn't race across worker threads).
+    found = _find_lynette()
+    if found is None:
+        print(
+            "WARNING: Lynette binary unavailable — AST-level safety check will be "
+            "SKIPPED (string-level checks for assume/admit/external_body still apply)."
+        )
+    else:
+        print(f"Lynette binary: {found}")
 
     cfg = load_config(args.config)
     tasks_dir = Path(args.tasks_dir)
