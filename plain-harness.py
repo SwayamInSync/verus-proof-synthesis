@@ -85,9 +85,9 @@ REPAIR_PROMPT_TEMPLATE = """\
 The following Verus code has proof bodies that need to be filled in or fixed \
 so that it verifies. Provide SEARCH/REPLACE edits.
 
-Original code:
+Current Code:
 ```verus
-{original_code}
+{current_code}
 ```
 
 {history}
@@ -99,7 +99,7 @@ The most recent code failed Verus verification with the following errors:
 ```
 
 Provide SEARCH/REPLACE edits to fix the proof. Your edits will be applied to \
-the **Original code**.
+the **above given code**.
 **Important**: Analyze the previous attempts carefully before proposing a new repair. \
 Avoid repeating failed approaches. Consider why each attempt failed and ensure your \
 solution addresses those issues.
@@ -547,7 +547,7 @@ def repair_task(
             messages.append({
                 "role": "user",
                 "content": REPAIR_PROMPT_TEMPLATE.format(
-                    original_code=original_code,
+                    current_code=current_code,
                     history=history_text, errors=last_errors
                 ),
             })
