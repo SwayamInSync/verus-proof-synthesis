@@ -703,8 +703,13 @@ def run_one_model(model_entry: dict[str, Any], defaults: dict[str, Any],
         _save_meta()
         log(f"  plain-harness done in {dur:.1f}s (rc={rc})")
 
-        meta["completed"] = True
-        result.completed = True
+        if rc == 0:
+            meta["completed"] = True
+            result.completed = True
+        else:
+            meta["error"] = f"plain-harness exited with rc={rc}"
+            result.error = meta["error"]
+            log(f"  WARNING: plain-harness exited non-zero (rc={rc}); not marking run as completed")
         result.exit_codes = dict(meta["exit_codes"])
     except Exception as e:
         meta["error"] = f"{type(e).__name__}: {e}"

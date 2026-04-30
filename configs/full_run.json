@@ -27,7 +27,8 @@
       },
       "vllm_extra_args": [
         "--data-parallel-size",
-        "8",
+        "4",
+        "--enable-expert-parallel",
         "--max-model-len",
         "262144",
         "--trust-remote-code",
