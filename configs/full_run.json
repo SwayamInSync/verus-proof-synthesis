@@ -78,6 +78,8 @@
       "vllm_extra_args": [
         "--data-parallel-size",
         "4",
+        "--tensor-parallel-size",
+        "2",
         "--enable-expert-parallel",
         "--max-model-len",
         "262144",
@@ -93,6 +95,9 @@
       "vllm_extra_args": [
         "--tensor-parallel-size",
         "4",
+        "--data-parallel-size",
+        "2",
+        "--enable-expert-parallel",
         "--max-model-len",
         "262144",
         "--trust-remote-code"
@@ -123,6 +128,8 @@
       "vllm_extra_args": [
         "--data-parallel-size",
         "4",
+        "--tensor-parallel-size",
+        "2",
         "--enable-expert-parallel",
         "--max-model-len",
         "262144",
@@ -140,6 +147,9 @@
       "vllm_extra_args": [
         "--tensor-parallel-size",
         "4",
+        "--data-parallel-size",
+        "2",
+        "--enable-expert-parallel",
         "--max-model-len",
         "262144",
         "--reasoning-parser",
