@@ -28,6 +28,8 @@
       "vllm_extra_args": [
         "--data-parallel-size",
         "4",
+        "--tensor-parallel-size",
+        "2",
         "--enable-expert-parallel",
         "--max-model-len",
         "262144",
