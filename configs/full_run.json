@@ -10,7 +10,7 @@
     "weights_dir": "/workdir/models",
     "vllm_startup_timeout_sec": 2400,
     "repairs": 5,
-    "harness_workers": 3,
+    "harness_workers": 8,
     "api_timeout": 300,
     "aoai_max_retries": 3,
     "debug_max_attempt": 3,
