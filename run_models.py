@@ -676,7 +676,7 @@ def run_one_model(model_entry: dict[str, Any], defaults: dict[str, Any],
             download_weights_hf(src["repo_id"], weights_dir, src.get("revision"), download_log)
         else:
             download_weights_azcopy(src["url"], weights_dir, download_log,
-                                    extra_args=resolved.get("azcopy_extra_args"))
+                                    extra_args=src.get("azcopy_extra_args"))
         model_dir = verify_weights(weights_dir)
         meta["timings"]["download_sec"] = time.time() - t0
         log(f"  weights ready in {meta['timings']['download_sec']:.1f}s")
