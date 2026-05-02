@@ -267,11 +267,14 @@ def download_weights_hf(repo_id: str, dest: Path, revision: str | None,
     )
 
 
-def download_weights_azcopy(url: str, dest: Path, log_path: Path) -> None:
+def download_weights_azcopy(url: str, dest: Path, log_path: Path,
+                            extra_args: list[str] | None = None) -> None:
     if shutil.which("azcopy") is None:
         raise RuntimeError("azcopy binary not found on PATH")
     dest.mkdir(parents=True, exist_ok=True)
     cmd = ["azcopy", "copy", url, str(dest), "--recursive=true"]
+    if extra_args:
+        cmd.extend(extra_args)
     log(f"  azcopy: {' '.join(cmd[:3])} <url> {' '.join(cmd[3:])}")
     with open(log_path, "a") as logf:
         logf.write(f"\n=== azcopy copy <url> -> {dest} ===\n")
@@ -672,7 +675,8 @@ def run_one_model(model_entry: dict[str, Any], defaults: dict[str, Any],
         if src["type"] == "hf":
             download_weights_hf(src["repo_id"], weights_dir, src.get("revision"), download_log)
         else:
-            download_weights_azcopy(src["url"], weights_dir, download_log)
+            download_weights_azcopy(src["url"], weights_dir, download_log,
+                                    extra_args=resolved.get("azcopy_extra_args"))
         model_dir = verify_weights(weights_dir)
         meta["timings"]["download_sec"] = time.time() - t0
         log(f"  weights ready in {meta['timings']['download_sec']:.1f}s")

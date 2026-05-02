@@ -53,6 +53,8 @@ decreases clauses, and reveal/trigger annotations.
 - Do NOT change executable code, requires/ensures clauses, or function signatures.
 - Do NOT use assume(...).
 - Express your changes using the SEARCH/REPLACE format described below.
+- Your SEARCH/REPLACE edits must always target the **original code** shown in \
+the first user message. Every attempt starts fresh from that original code.
 
 Response format — every edit must use this exact structure:
 
@@ -65,44 +67,56 @@ Response format — every edit must use this exact structure:
 ```
 
 Rules for SEARCH/REPLACE blocks:
-1. The SEARCH section must be an exact, uniquely-identifiable snippet from the code.
+1. The SEARCH section must be an exact, uniquely-identifiable snippet from the \
+original code (the first user message).
 2. Preserve indentation exactly.
 3. Multiple SEARCH/REPLACE blocks are allowed.
 4. To insert code, include surrounding context in SEARCH.
 5. Before the blocks, briefly explain your reasoning.
+6. If a previous attempt failed, do NOT repeat the same approach.
 """
 
 INITIAL_PROMPT_TEMPLATE = """\
 The following Verus code has proof bodies that need to be filled in or fixed \
-so that it verifies. Provide SEARCH/REPLACE edits.
+so that it verifies. Provide SEARCH/REPLACE edits targeting the code below.
 
 ```verus
 {code}
 ```
 """
 
-REPAIR_PROMPT_TEMPLATE = """\
-The following Verus code has proof bodies that need to be filled in or fixed \
-so that it verifies. Provide SEARCH/REPLACE edits.
-
-Current Code:
-```verus
-{current_code}
-```
-
-{history}
-
-The most recent code failed Verus verification with the following errors:
+FEEDBACK_TEMPLATE_VERUS_FAIL = """\
+Your SEARCH/REPLACE edits were applied to the original code but Verus \
+verification failed with the following errors:
 
 ```
 {errors}
 ```
 
-Provide SEARCH/REPLACE edits to fix the proof. Your edits will be applied to \
-the **above given code**.
-**Important**: Analyze the previous attempts carefully before proposing a new repair. \
-Avoid repeating failed approaches. Consider why each attempt failed and ensure your \
-solution addresses those issues.
+Provide new SEARCH/REPLACE edits targeting the original code shown above. \
+Do NOT repeat the same approach.
+"""
+
+FEEDBACK_TEMPLATE_REJECTED_EDITS = """\
+Your SEARCH/REPLACE edits could not be applied: {reason}
+
+Provide new SEARCH/REPLACE edits targeting the original code shown above. \
+Make sure the SEARCH sections exactly match snippets from the original code.
+"""
+
+FEEDBACK_TEMPLATE_REJECTED_UNSAFE = """\
+Your SEARCH/REPLACE edits were rejected because they made unsafe changes: \
+{reason}
+
+Provide new SEARCH/REPLACE edits targeting the original code shown above. \
+Only modify ghost proof code.
+"""
+
+FEEDBACK_TEMPLATE_LLM_ERROR = """\
+The previous attempt encountered an error: {reason}
+
+Please try again. Provide SEARCH/REPLACE edits targeting the original code \
+shown above.
 """
 
 
@@ -520,13 +534,20 @@ def repair_task(
     verus_path = cfg["verus_path"]
 
     original_code = rs_path.read_text(encoding="utf-8")
-    current_code = insert_loop_isolation(original_code)
-    # Safety baseline = code after loop_isolation (matches verusage behavior)
-    safety_baseline = current_code
+    baseline_code = insert_loop_isolation(original_code)
+    # Safety baseline = code after loop_isolation (matches verusage behavior).
+    # All edits are always applied to this baseline, never to an evolved version.
+    safety_baseline = baseline_code
     total_in = total_out = 0
     start = time.time()
-    last_errors = ""
     attempt_history: list[AttemptRecord] = []
+    best_code = baseline_code  # best code seen (for final output)
+
+    # Multi-turn messages list: grows with each attempt.
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": INITIAL_PROMPT_TEMPLATE.format(code=baseline_code)},
+    ]
 
     print(f"    [{rs_path.name}] starting ({len(original_code)} chars)...", flush=True)
 
@@ -535,22 +556,6 @@ def repair_task(
             return None
 
         print(f"    [{rs_path.name}] attempt {attempt}/{max_repairs} — calling LLM...", flush=True)
-
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        if attempt == 1:
-            messages.append({
-                "role": "user",
-                "content": INITIAL_PROMPT_TEMPLATE.format(code=current_code),
-            })
-        else:
-            history_text = format_attempt_history(attempt_history)
-            messages.append({
-                "role": "user",
-                "content": REPAIR_PROMPT_TEMPLATE.format(
-                    current_code=current_code,
-                    history=history_text, errors=last_errors
-                ),
-            })
 
         content = None
         p_tok = c_tok = 0
@@ -565,25 +570,31 @@ def repair_task(
             print(f"    [{rs_path.name}] attempt {attempt} — BadRequest: {e}", flush=True)
             _log_attempt(rs_path.stem, attempt, messages, None, None,
                          None, "", None, f"BadRequest: {e}", 0, 0)
-            last_errors = f"LLM BadRequest: {e}"
             attempt_history.append(AttemptRecord(
                 attempt_id=attempt, status="LLM_ERROR",
                 diff="LLM BadRequest error, no response is generated", error_text=str(e),
-                code_before=current_code,
+                code_before=baseline_code,
             ))
+            # Add placeholder assistant + feedback to keep multi-turn coherent
+            messages.append({"role": "assistant", "content": "(no response due to error)"})
+            messages.append({"role": "user", "content": FEEDBACK_TEMPLATE_LLM_ERROR.format(reason=str(e))})
             continue
         except Exception as e:
             print(f"    [{rs_path.name}] attempt {attempt} — LLM error: {e}", flush=True)
             _log_attempt(rs_path.stem, attempt, messages, None, None,
                          None, "", None, f"LLM error: {e}", 0, 0)
-            last_errors = f"LLM error: {e}"
             attempt_history.append(AttemptRecord(
                 attempt_id=attempt, status="LLM_ERROR",
                 diff="LLM call failed, no response is generated", error_text=str(e),
-                code_before=current_code,
+                code_before=baseline_code,
             ))
+            messages.append({"role": "assistant", "content": "(no response due to error)"})
+            messages.append({"role": "user", "content": FEEDBACK_TEMPLATE_LLM_ERROR.format(reason=str(e))})
             continue
-        
+
+        # Add the assistant's response to the conversation
+        messages.append({"role": "assistant", "content": content})
+
         # Extract the raw LLM suggestion for logging (even if we can't apply it)
         _log_llm_response(rs_path.stem, attempt, content)
 
@@ -595,21 +606,21 @@ def repair_task(
                 parts.append(f"<<<<<<< SEARCH\n{search}\n=======\n{replace}\n>>>>>>> REPLACE")
             suggested_change = "\n\n".join(parts)
         else:
-            # No SEARCH/REPLACE found — use raw content
             suggested_change = "LLM did not provide valid SEARCH/REPLACE blocks. Raw response:\n" + content
 
-        new_code, edits_applied, edits_total = apply_edits(current_code, content)
+        # Always apply edits to the baseline (original) code, not an evolved version
+        new_code, edits_applied, edits_total = apply_edits(safety_baseline, content)
         if not new_code:
             fail_msg = f"Failed to apply SEARCH/REPLACE edits (0/{edits_total} blocks matched)"
             _log_attempt(rs_path.stem, attempt, messages, content, None,
                          None, "", None, fail_msg, p_tok, c_tok)
-            last_errors = fail_msg
             attempt_history.append(AttemptRecord(
                 attempt_id=attempt, status="REJECTED_EDITS",
                 diff=suggested_change,
                 error_text=fail_msg,
-                code_before=current_code,
+                code_before=baseline_code,
             ))
+            messages.append({"role": "user", "content": FEEDBACK_TEMPLATE_REJECTED_EDITS.format(reason=fail_msg)})
             continue
         if edits_applied < edits_total:
             print(f"    [{rs_path.name}] attempt {attempt} — applied {edits_applied}/{edits_total} SEARCH/REPLACE blocks (rest skipped: no match)", flush=True)
@@ -618,32 +629,24 @@ def repair_task(
         if not safe:
             _log_attempt(rs_path.stem, attempt, messages, content, new_code,
                          False, reason, None, "", p_tok, c_tok)
-            last_errors = f"Rejected: {reason}"
             attempt_history.append(AttemptRecord(
                 attempt_id=attempt, status="REJECTED_UNSAFE",
                 diff=suggested_change, error_text=f"Unsafe change rejected: {reason}",
-                code_before=current_code, code_after=new_code,
+                code_before=baseline_code, code_after=new_code,
             ))
-            continue  # don't update current_code with unsafe changes
+            messages.append({"role": "user", "content": FEEDBACK_TEMPLATE_REJECTED_UNSAFE.format(reason=reason)})
+            continue
 
-        code_before_verus = current_code  # snapshot for history
-        current_code = new_code
+        best_code = new_code
 
-        verified, error_text, verus_exit = run_verus(current_code, verus_path)
+        verified, error_text, verus_exit = run_verus(new_code, verus_path)
 
         # Log the full attempt trace
-        _log_attempt(rs_path.stem, attempt, messages, content, current_code,
+        _log_attempt(rs_path.stem, attempt, messages, content, new_code,
                      True, "", verified, error_text, p_tok, c_tok)
 
-        if not verified:
-            attempt_history.append(AttemptRecord(
-                attempt_id=attempt, status="VERUS_FAIL",
-                diff=suggested_change, error_text=error_text,
-                code_before=code_before_verus, code_after=current_code,
-            ))
-
         if verified:
-            _save_output_code(rs_path.stem, current_code, "verified")
+            _save_output_code(rs_path.stem, new_code, "verified")
             elapsed = time.time() - start
             return {
                 "file": rs_path.name,
@@ -655,9 +658,16 @@ def repair_task(
                 "output_tokens": total_out,
                 "total_tokens": total_in + total_out,
             }
-        last_errors = error_text
 
-    _save_output_code(rs_path.stem, current_code, "failed")
+        # Verification failed — add feedback and continue
+        attempt_history.append(AttemptRecord(
+            attempt_id=attempt, status="VERUS_FAIL",
+            diff=suggested_change, error_text=error_text,
+            code_before=baseline_code, code_after=new_code,
+        ))
+        messages.append({"role": "user", "content": FEEDBACK_TEMPLATE_VERUS_FAIL.format(errors=error_text)})
+
+    _save_output_code(rs_path.stem, best_code, "failed")
     elapsed = time.time() - start
     return {
         "file": rs_path.name,
