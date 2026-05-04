@@ -210,7 +210,7 @@
         "repo_id": "deepseek-ai/DeepSeek-V3.2"
       },
       "vllm_extra_args": [
-        "--data-parallel-size",
+        "--tensor-parallel-size",
         "8",
         "--enable-expert-parallel",
         "--max-model-len",
