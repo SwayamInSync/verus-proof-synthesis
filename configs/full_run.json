@@ -210,6 +210,8 @@
         "repo_id": "deepseek-ai/DeepSeek-V3.2"
       },
       "vllm_extra_args": [
+        "--kernel-config.enable_flashinfer_autotune",
+        "False",
         "--data-parallel-size",
         "8",
         "--enable-expert-parallel",
