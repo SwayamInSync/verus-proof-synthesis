@@ -75,10 +75,10 @@ class InvariantEndErrorAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Invariant end repair action failed: {e}")
             return ActionResult(
-                success=False,
-                modified_code=observation.code,
                 action_taken=action_type,
                 explanation=f"Invariant end repair action execution failed: {e}",
+                candidates=[],
+                original_code=observation.code,
             )
 
     def mark_last_action_accepted(self, accepted: bool, feedback: str = ""):

@@ -1,0 +1,298 @@
+{
+  "_comment": [
+    "Multi-model plain-harness (VeruSAGE-Bench) config for 8x B200 cluster.",
+    "Models, sources, and vllm_extra_args mirror VerifyThisBench_iclr/scripts/configs/full_run.json.",
+    "max_token / max_model_context are auto-derived from --max-model-len in vllm_extra_args.",
+    "action_max_tokens is 8192 for max_model_len == 32768, else 81920."
+  ],
+  "defaults": {
+    "port": 8000,
+    "weights_dir": "/workdir/models",
+    "vllm_startup_timeout_sec": 2400,
+    "repairs": 5,
+    "harness_workers": 8,
+    "api_timeout": 300,
+    "aoai_max_retries": 3,
+    "debug_max_attempt": 3,
+    "debug_temp": 1.0,
+    "verus_path": "/workdir/verified-code-gen/verus-binary/verus/verus",
+    "tasks_dir": "/workdir/verified-code-gen/benchmarks/verus-proof-synthesis/benchmarks/VeruSAGE-Bench/tasks"
+  },
+  "models": [
+    {
+      "name": "Qwen3-4B-Instruct-SFT-Multi-Format",
+      "source": {
+        "type": "azcopy",
+        "url": "https://nofuncoder4140055734.blob.core.windows.net/t-swsingh/verus-ckpts/qwen3-4b-ins-sft-multi-format",
+        "azcopy_extra_args": [
+          "--exclude-path",
+          "checkpoint-1808;checkpoint-2712;checkpoint-904"
+        ]
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "8",
+        "--max-model-len",
+        "262144",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "4",
+        "--tensor-parallel-size",
+        "2",
+        "--enable-expert-parallel",
+        "--max-model-len",
+        "262144",
+        "--trust-remote-code",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "qwen3_coder"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+      },
+      "vllm_extra_args": [
+        "--tensor-parallel-size",
+        "8",
+        "--max-model-len",
+        "262144",
+        "--trust-remote-code",
+        "--enable-expert-parallel",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "qwen3_coder"
+      ]
+    },
+    {
+      "name": "Qwen/Qwen3-4B-Instruct-2507",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-4B-Instruct-2507"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "8",
+        "--max-model-len",
+        "262144",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "4",
+        "--tensor-parallel-size",
+        "2",
+        "--enable-expert-parallel",
+        "--max-model-len",
+        "262144",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+      },
+      "vllm_extra_args": [
+        "--tensor-parallel-size",
+        "4",
+        "--data-parallel-size",
+        "2",
+        "--enable-expert-parallel",
+        "--max-model-len",
+        "262144",
+        "--trust-remote-code"
+      ]
+    },
+    {
+      "name": "Qwen/Qwen3-4B-Thinking-2507",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-4B-Thinking-2507"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "8",
+        "--max-model-len",
+        "262144",
+        "--reasoning-parser",
+        "deepseek_r1",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "Qwen/Qwen3-30B-A3B-Thinking-2507",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-30B-A3B-Thinking-2507"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "4",
+        "--tensor-parallel-size",
+        "2",
+        "--enable-expert-parallel",
+        "--max-model-len",
+        "262144",
+        "--reasoning-parser",
+        "deepseek_r1",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+      "source": {
+        "type": "hf",
+        "repo_id": "Qwen/Qwen3-235B-A22B-Thinking-2507"
+      },
+      "vllm_extra_args": [
+        "--tensor-parallel-size",
+        "4",
+        "--data-parallel-size",
+        "2",
+        "--enable-expert-parallel",
+        "--max-model-len",
+        "262144",
+        "--reasoning-parser",
+        "deepseek_r1",
+        "--trust-remote-code"
+      ]
+    },
+    {
+      "name": "moonshotai/Kimi-K2.5",
+      "source": {
+        "type": "hf",
+        "repo_id": "moonshotai/Kimi-K2.5"
+      },
+      "vllm_extra_args": [
+        "--tensor-parallel-size",
+        "8",
+        "--max-model-len",
+        "262144",
+        "--reasoning-parser",
+        "kimi_k2",
+        "--tool-call-parser",
+        "kimi_k2",
+        "--mm-encoder-tp-mode",
+        "data",
+        "--trust-remote-code"
+      ]
+    },
+    {
+      "name": "deepseek-ai/DeepSeek-V3.2",
+      "source": {
+        "type": "hf",
+        "repo_id": "deepseek-ai/DeepSeek-V3.2"
+      },
+      "vllm_extra_args": [
+        "--kernel-config.enable_flashinfer_autotune",
+        "False",
+        "--data-parallel-size",
+        "8",
+        "--enable-expert-parallel",
+        "--max-model-len",
+        "131072",
+        "--reasoning-parser",
+        "deepseek_v3",
+        "--tool-call-parser",
+        "deepseek_v32",
+        "--enable-auto-tool-choice",
+        "--tokenizer-mode",
+        "deepseek_v32",
+        "--trust-remote-code"
+      ]
+    },
+    {
+      "name": "openai/gpt-oss-120b",
+      "source": {
+        "type": "hf",
+        "repo_id": "openai/gpt-oss-120b"
+      },
+      "vllm_extra_args": [
+        "--tensor-parallel-size",
+        "8",
+        "--max-model-len",
+        "131072",
+        "--trust-remote-code"
+      ]
+    },
+    {
+      "name": "Qwen-VeruSyn-Qwen2.5-Coder-32B-Instruct",
+      "source": {
+        "type": "azcopy",
+        "url": "https://nofuncoder4140055734.blob.core.windows.net/t-swsingh/checkpoint-105"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "8",
+        "--max-model-len",
+        "32768",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "PSV-Verus-Qwen2.5-Coder-3B-Instruct",
+      "source": {
+        "type": "azcopy",
+        "url": "https://nofuncoder4140055734.blob.core.windows.net/t-swsingh/psv-verus"
+      },
+      "vllm_extra_args": [
+        "--data-parallel-size",
+        "8",
+        "--max-model-len",
+        "32768",
+        "--trust-remote-code"
+      ],
+      "harness_workers": 16
+    },
+    {
+      "name": "MiniMaxAI/MiniMax-M2.5",
+      "source": {
+        "type": "hf",
+        "repo_id": "MiniMaxAI/MiniMax-M2.5"
+      },
+      "env": {
+        "SAFETENSORS_FAST_GPU": "1"
+      },
+      "vllm_extra_args": [
+        "--tensor-parallel-size",
+        "8",
+        "--max-model-len",
+        "196608",
+        "--enable-expert-parallel",
+        "--reasoning-parser",
+        "minimax_m2_append_think",
+        "--tool-call-parser",
+        "minimax_m2",
+        "--enable-auto-tool-choice",
+        "--trust-remote-code"
+      ]
+    }
+  ]
+}

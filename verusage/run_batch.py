@@ -39,7 +39,7 @@ def parse_tokens_from_log(log_file):
     return total_input, total_output
 
 
-def run_batch(input_dir, config_file, output_dir=None, verus_args="", continue_from=None):
+def run_batch(input_dir, config_file, output_dir=None, verus_args="", continue_from=None, repair_steps=None):
     """
     Run repair on all .rs files in the input directory.
 
@@ -49,8 +49,19 @@ def run_batch(input_dir, config_file, output_dir=None, verus_args="", continue_f
         output_dir: Output directory for batch results (optional)
         verus_args: Additional arguments to pass to Verus
         continue_from: Directory to continue execution from (optional)
+        repair_steps: Override number of repair steps (reads from config if None)
     """
     input_dir_path = Path(input_dir)
+
+    # Resolve repair steps: CLI override > config > default 20
+    if repair_steps is None:
+        try:
+            with open(config_file) as cf:
+                cfg = json.load(cf)
+                repair_steps = cfg.get("repair_steps", 20)
+        except Exception:
+            repair_steps = 20
+    print(f"Repair steps per task: {repair_steps}")
 
     # Results tracking
     results = []
@@ -186,6 +197,8 @@ def run_batch(input_dir, config_file, output_dir=None, verus_args="", continue_f
                 "--outdir",
                 str(output_dir),
             ]
+
+            cmd.extend(["--repair", str(repair_steps)])
 
             if verus_args:
                 print(f"Verus args: {verus_args}")
@@ -436,6 +449,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--continue-from", type=str, default=None, help="Directory to continue execution from"
     )
+    parser.add_argument(
+        "--repair", type=int, default=None,
+        help="Override repair steps per task (default: read from config, fallback 20)"
+    )
 
     args = parser.parse_args()
 
@@ -448,5 +465,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     run_batch(
-        args.input_dir, args.config_file, args.output_dir, args.verus_args, args.continue_from
+        args.input_dir, args.config_file, args.output_dir, args.verus_args, args.continue_from,
+        args.repair
     )

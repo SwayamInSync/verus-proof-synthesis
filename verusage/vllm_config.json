@@ -1,0 +1,16 @@
+{
+    "use_openai": true,
+    "aoai_api_base": ["http://localhost:8001/v1"],
+    "aoai_api_key": ["dummy"],
+    "aoai_max_retries": 3,
+    "max_token": 32768,
+    "max_model_context": 32768,
+    "action_max_tokens": 8192,
+    "api_timeout": 300,
+    "aoai_generation_model": "Qwen-VeruSyn",
+    "aoai_debug_model": "Qwen-VeruSyn",
+    "verus_path": "/home/t-swsingh/proof-model/ours/verified-code-gen/verus-binary/verus/verus",
+    "debug_max_attempt": 3,
+    "debug_temp": 1.0,
+    "repair_steps": 5
+}

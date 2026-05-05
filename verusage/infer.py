@@ -92,12 +92,12 @@ class LLM:
         query,
         system_info=None,
         answer_num=1,
-        max_tokens=8192,
-        temp=1.0,
+        max_tokens=None,
+        temp=None,
         json=False,
         return_msg=False,
         verbose=False,
-        timeout=100,
+        timeout=None,
     ):
         """
         Args:
@@ -116,6 +116,14 @@ class LLM:
         Returns:
             answers: list of str (or tuple of (list of str, messages) if return_msg=True)
         """
+        # Resolve defaults from config
+        if max_tokens is None:
+            max_tokens = getattr(self.config, 'action_max_tokens', 8192)
+        if temp is None:
+            temp = getattr(self.config, 'debug_temp', 1.0)
+        if timeout is None:
+            timeout = getattr(self.config, 'api_timeout', 120)
+
         self._reset_client_id()
         if verbose:
             self.logger.info(f"Using client {self.client_id}")
@@ -134,6 +142,17 @@ class LLM:
 
         messages.append({"role": "user", "content": query})
 
+        # # Dynamically cap max_tokens to fit within model context window
+        # max_model_context = getattr(self.config, 'max_model_context', 32768)
+        # estimated_input_tokens = sum(len(m.get("content", "")) for m in messages) // 4  # ~4 chars/token
+        # if estimated_input_tokens + max_tokens > max_model_context:
+        #     old_max_tokens = max_tokens
+        #     max_tokens = max(256, max_model_context - estimated_input_tokens - 64)  # 64 token safety margin
+        #     self.logger.warning(
+        #         f"Capping max_tokens from {old_max_tokens} to {max_tokens} "
+        #         f"(estimated input: ~{estimated_input_tokens} tokens, context: {max_model_context})"
+        #     )
+
         tries = 0
         max_tries = 5
 
@@ -151,7 +170,7 @@ class LLM:
                                 model=engine,
                                 messages=messages,
                                 temperature=temp,
-                                max_completion_tokens=20000,
+                                max_completion_tokens=max_tokens,
                             )
                         )
                 elif "o3" in engine or "o4" in engine or "gpt-5" in engine:
@@ -164,7 +183,7 @@ class LLM:
                         model=engine,
                         messages=messages,
                         temperature=temp,
-                        max_completion_tokens=20000,
+                        max_completion_tokens=max_tokens,
                     )
                 else:
                     # Standard models - also currently limited to 1 response
@@ -176,7 +195,7 @@ class LLM:
                         model=engine,
                         messages=messages,
                         temperature=temp,
-                        max_tokens=20000,
+                        max_tokens=max_tokens,
                         # n=answer_num,  # Disabled: uncomment to enable multiple responses
                         timeout=timeout,
                     )
@@ -229,16 +248,44 @@ class LLM:
         if "gpt-oss" in engine:
             responses = []
             for answer in answers:
-                responses.append(answer.choices[0].message.content)
+                content = answer.choices[0].message.content
+                # Handle thinking models where content may be None
+                # (all tokens used for reasoning_content)
+                if content is None:
+                    reasoning = getattr(answer.choices[0].message, 'reasoning_content', None)
+                    if reasoning:
+                        self.logger.warning(
+                            "LLM returned None content (all tokens used for reasoning). "
+                            f"Reasoning length: {len(reasoning)} chars. Using empty string."
+                        )
+                    else:
+                        self.logger.warning("LLM returned None content with no reasoning.")
+                    content = ""
+                responses.append(content)
             return responses
 
         self.logger.info(f"Input tokens: {answers.usage.prompt_tokens}")
         self.logger.info(f"Output tokens: {answers.usage.completion_tokens}")
 
+        def _extract_content(response):
+            """Extract content from response, handling thinking models where content may be None."""
+            content = response.message.content
+            if content is None:
+                reasoning = getattr(response.message, 'reasoning_content', None)
+                if reasoning:
+                    self.logger.warning(
+                        "LLM returned None content (all tokens used for reasoning). "
+                        f"Reasoning length: {len(reasoning)} chars. Using empty string."
+                    )
+                else:
+                    self.logger.warning("LLM returned None content with no reasoning.")
+                content = ""
+            return content
+
         if return_msg:
-            return [response.message.content for response in answers.choices], messages
+            return [_extract_content(response) for response in answers.choices], messages
         else:
-            return [response.message.content for response in answers.choices]
+            return [_extract_content(response) for response in answers.choices]
 
     def infer_llm_with_history(
         self,
@@ -246,8 +293,8 @@ class LLM:
         history,
         query,
         answer_num=1,
-        max_tokens=2048,
-        temp=0.7,
+        max_tokens=None,
+        temp=None,
         json=False,
         return_msg=False,
         verbose=False,
@@ -260,6 +307,12 @@ class LLM:
         Returns:
             answers: list of str
         """
+        # Resolve defaults from config
+        if max_tokens is None:
+            max_tokens = getattr(self.config, 'action_max_tokens', 2048)
+        if temp is None:
+            temp = getattr(self.config, 'debug_temp', 0.7)
+
         self._reset_client_id()
         # self.client_id = 0
         if verbose:
@@ -297,13 +350,30 @@ class LLM:
                 else:
                     self._add_client_id()
                 continue
+        def _extract_content_with_history(response):
+            """Extract content handling thinking models and length-truncated responses."""
+            if response.finish_reason == "length":
+                return ""
+            content = response.message.content
+            if content is None:
+                reasoning = getattr(response.message, 'reasoning_content', None)
+                if reasoning:
+                    self.logger.warning(
+                        "LLM returned None content (all tokens used for reasoning). "
+                        f"Reasoning length: {len(reasoning)} chars. Using empty string."
+                    )
+                else:
+                    self.logger.warning("LLM returned None content with no reasoning.")
+                content = ""
+            return content
+
         if return_msg:
             return [
-                response.message.content if response.finish_reason != "length" else ""
+                _extract_content_with_history(response)
                 for response in answers.choices
             ], messages
         else:
             return [
-                response.message.content if response.finish_reason != "length" else ""
+                _extract_content_with_history(response)
                 for response in answers.choices
             ]

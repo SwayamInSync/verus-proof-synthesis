@@ -99,11 +99,10 @@ class OtherErrorAgent(BaseAgent):
             self.logger.error(f"OtherErrorAgent action failed: {e}")
             # Return a failure result with original code
             return ActionResult(
-                success=False,
-                modified_code=observation.code,
                 action_taken=action_type,
                 explanation=f"Action execution failed: {e}",
-                candidates=[observation.code],
+                candidates=[],
+                original_code=observation.code,
             )
 
     def mark_last_action_accepted(self, accepted: bool, feedback: str = ""):

@@ -460,7 +460,7 @@ Code to fix:
                 self.default_system,
                 original_code=code,
                 answer_num=self.get_action_candidate_num(),
-                max_tokens=4096,
+                # max_tokens from config
                 temp=1.0,
                 skip_history=True,
             )
